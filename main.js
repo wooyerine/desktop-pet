@@ -11,7 +11,7 @@ function send(type) {
 
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const W = 372, H = 400;
+  const W = 372, H = 560; // 랭킹 패널까지 잘리지 않는 높이
   win = new BrowserWindow({
     width: W,
     height: H,

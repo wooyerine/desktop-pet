@@ -458,6 +458,7 @@ function updateNag(now) {
  * ================================================================ */
 const XP_PER_LEVEL = (lv) => lv * 1000;
 const WORK_BONUS = 50;
+const WORK_BONUS_MIN_MS = 10 * 60000; // 10분 이상 일해야 완주 보너스 (시작/끝 반복 어뷰징 방지)
 const POMODORO_BONUS = 100;
 
 const game = {
@@ -838,7 +839,8 @@ btnWork.addEventListener('click', () => {
     btnAway.classList.remove('on');
     showToast('일 시작! 열심히 하면 펫이 자라요 💪');
   } else {
-    const mins = Math.max(1, Math.round((Date.now() - game.sessionStart) / 60000));
+    const sessionMs = Date.now() - game.sessionStart;
+    const mins = Math.max(1, Math.round(sessionMs / 60000));
     const net = game.sessionXp >= 0 ? `+${game.sessionXp}` : `${game.sessionXp}`;
     game.working = false;
     game.away = false;
@@ -846,9 +848,15 @@ btnWork.addEventListener('click', () => {
     btnWork.title = '일 시작';
     btnAway.classList.add('hidden');
     btnAway.classList.remove('on');
-    addXp(WORK_BONUS);
-    state.celebrateUntil = performance.now() + CELEBRATE_MS;
-    showToast(`일 끝! ${mins}분 · 세션 ${net}점 + 완주 보너스 ${WORK_BONUS}점`);
+    // 보너스는 10분 이상 + 순증가 세션만 — 시작/끝 반복으로는 못 얻는다
+    const bonusOk = sessionMs >= WORK_BONUS_MIN_MS && game.sessionXp > 0;
+    if (bonusOk) {
+      addXp(WORK_BONUS);
+      state.celebrateUntil = performance.now() + CELEBRATE_MS;
+      showToast(`일 끝! ${mins}분 · 세션 ${net}점 + 완주 보너스 ${WORK_BONUS}점`);
+    } else {
+      showToast(`일 끝! ${mins}분 · 세션 ${net}점 (보너스는 10분 이상 일해야 나와요)`);
+    }
     pushScore();
   }
   updateHud();
