@@ -25,9 +25,12 @@
 [Releases](https://github.com/wooyerine/desktop-pet/releases)에서 `.dmg`를 받아
 `Desktop Pet.app`을 응용 프로그램에 드래그하면 끝이에요. Apple Silicon(M1 이상) 전용입니다.
 
-> ⚠️ 서명되지 않은 앱이라 처음 열 때 macOS가 차단해요.
-> **앱을 우클릭 → 열기**로 실행하거나, 터미널에서
-> `xattr -cr "/Applications/Desktop Pet.app"` 실행 후 여세요.
+> ⚠️ 서명되지 않은 앱이라 처음 열 때 macOS가 **"손상되었기 때문에 열 수 없다"**며
+> 차단해요 (실제 손상 아님). 터미널에서 아래 한 줄을 실행한 뒤 다시 여세요:
+>
+> ```bash
+> xattr -cr "/Applications/Desktop Pet.app"
+> ```
 
 ## 개발용 실행
 
