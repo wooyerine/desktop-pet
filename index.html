@@ -12,13 +12,23 @@
       <span id="bubble-time">00:00</span>
     </div>
     <div id="nag" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
 
     <canvas id="pet-canvas" width="352" height="192"></canvas>
 
     <div id="bar">
+      <button id="btn-work" title="일 시작">&#128188;</button>
+      <button id="btn-away" title="자리 비움" class="hidden">&#9749;</button>
       <button id="btn-timer" title="뽀모도로 타이머">&#9200;</button>
+      <button id="btn-rank" title="랭킹">&#127942;</button>
       <button id="btn-pet" title="펫 교체">&#128062;</button>
       <button id="btn-quit" title="종료">&#10005;</button>
+    </div>
+
+    <div id="hud">
+      <span id="hud-level">Lv.1</span>
+      <div id="xpbar"><div id="xpfill"></div></div>
+      <span id="hud-xp">0/1000</span>
     </div>
 
     <div id="panel" class="hidden">
@@ -36,6 +46,17 @@
       </div>
       <div id="hint" class="hidden">
         &#9888; 키보드 감지를 하려면<br/>시스템 설정 &gt; 개인정보 보호 및 보안 &gt;<br/>손쉬운 사용에서 이 앱(Electron)을<br/>허용한 뒤 재시작해 주세요.
+      </div>
+    </div>
+
+    <div id="rank-panel" class="hidden">
+      <div class="panel-row">
+        <input id="nickname" type="text" maxlength="12" placeholder="닉네임" />
+        <button id="btn-nick">저장</button>
+      </div>
+      <ol id="rank-list"></ol>
+      <div class="panel-row">
+        <button id="btn-rank-refresh">새로고침</button>
       </div>
     </div>
   </div>

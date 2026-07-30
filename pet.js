@@ -442,13 +442,182 @@ const nagEl = document.getElementById('nag');
 function updateNag(now) {
   const idle = now - Math.max(state.lastKey, startTime);
   const timerBusy = timer.running || !bubble.classList.contains('hidden');
-  const show = DEMO === 'nag' || (!DEMO && !timerBusy && idle >= NAG_AFTER);
+  const show = DEMO === 'nag' ||
+    (!DEMO && !timerBusy && !game.away && idle >= NAG_AFTER);
   if (show && nagEl.classList.contains('hidden')) {
     nagEl.textContent = NAG_MESSAGES[Math.floor(Math.random() * NAG_MESSAGES.length)];
   }
   nagEl.classList.toggle('hidden', !show);
   state.nagging = show;
 }
+
+/* ================================================================
+ * 레벨 / 일 세션 (다마고치처럼 키우기)
+ *  - 일 시작 후 타이핑하면 +1/초, 잠들면 -1/초, 잔소리 뜨면 -2/초
+ *  - 자리 비움 중엔 증감 없음, 일 끝 완주 보너스 / 뽀모도로 보너스
+ * ================================================================ */
+const XP_PER_LEVEL = (lv) => lv * 1000;
+const WORK_BONUS = 50;
+const POMODORO_BONUS = 100;
+
+const game = {
+  level: Math.max(1, +localStorage.getItem('petLevel') || 1),
+  xp: Math.max(0, +localStorage.getItem('petXp') || 0),
+  working: false,
+  away: false,
+  sessionXp: 0,
+  sessionStart: 0,
+};
+
+const hudLevel = document.getElementById('hud-level');
+const hudXp = document.getElementById('hud-xp');
+const xpFill = document.getElementById('xpfill');
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+
+function saveGame() {
+  try {
+    localStorage.setItem('petLevel', game.level);
+    localStorage.setItem('petXp', game.xp);
+  } catch (_) { /* 무시 */ }
+}
+
+function updateHud() {
+  const need = XP_PER_LEVEL(game.level);
+  hudLevel.textContent = `Lv.${game.level}`;
+  if (game.working) {
+    const net = game.sessionXp >= 0 ? `+${game.sessionXp}` : `${game.sessionXp}`;
+    hudXp.textContent = game.away ? '☕ 자리 비움' : `💼 일하는 중 ${net}`;
+  } else {
+    hudXp.textContent = `${game.xp}/${need}`;
+  }
+  xpFill.style.width = `${Math.min(100, (game.xp / need) * 100)}%`;
+}
+
+function addXp(n) {
+  game.xp = Math.max(0, game.xp + n);
+  let leveled = false;
+  while (game.xp >= XP_PER_LEVEL(game.level)) {
+    game.xp -= XP_PER_LEVEL(game.level);
+    game.level += 1;
+    leveled = true;
+  }
+  if (leveled) {
+    state.celebrateUntil = performance.now() + CELEBRATE_MS;
+    if (window.pet) window.pet.notify('🎉 레벨 업!', `펫이 Lv.${game.level}이 되었어요!`);
+    pushScore();
+  }
+  saveGame();
+  updateHud();
+}
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 4000);
+}
+
+// 1초마다 세션 점수 정산
+setInterval(() => {
+  if (!game.working || game.away) return;
+  const now = performance.now();
+  let delta = 0;
+  if (state.nagging) delta = -2;
+  else if (state.mode === 'sleeping') delta = -1;
+  else if (now - state.lastKey < 10000) delta = 1; // 최근 10초 안에 타이핑
+  if (delta) {
+    game.sessionXp += delta;
+    addXp(delta);
+  } else {
+    updateHud();
+  }
+}, 1000);
+
+/* ================================================================
+ * 리더보드 (Supabase) — 친구들과 레벨 랭킹 경쟁
+ * publishable(anon) 키는 공개용이고, 테이블 권한은 RLS로 제어
+ * ================================================================ */
+const SB_URL = 'https://qefrpkflpdpzxyrwyxvd.supabase.co';
+const SB_KEY = 'sb_publishable_epIs7YckEJ8ETJkrrUHKfw_lhH6FEMA';
+const SB_TABLE = 'leaderboard';
+const PET_EMOJI = { cat: '🐱', dog: '🐶', rabbit: '🐰' };
+
+// 기기별 고유 ID (내 점수 행을 구분하는 키)
+let deviceId = localStorage.getItem('deviceId');
+if (!deviceId) {
+  deviceId = crypto.randomUUID();
+  try { localStorage.setItem('deviceId', deviceId); } catch (_) { /* 무시 */ }
+}
+let nickname = localStorage.getItem('nickname') || '';
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) throw new Error(`supabase ${res.status}`);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function pushScore() {
+  if (!nickname) return;
+  try {
+    await sbFetch(`${SB_TABLE}?on_conflict=device_id`, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        device_id: deviceId,
+        nickname,
+        level: game.level,
+        xp: game.xp,
+        pet: petKind,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch (err) {
+    console.error('점수 업로드 실패:', err.message);
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+const rankList = document.getElementById('rank-list');
+
+async function loadRanking() {
+  rankList.innerHTML = '<li>불러오는 중…</li>';
+  try {
+    const rows = await sbFetch(
+      `${SB_TABLE}?select=nickname,level,xp,pet&order=level.desc,xp.desc&limit=10`
+    );
+    if (!rows || !rows.length) {
+      rankList.innerHTML = '<li>아직 아무도 없어요 — 닉네임을 저장해 보세요!</li>';
+      return;
+    }
+    rankList.innerHTML = rows.map((r, i) => {
+      const me = r.nickname === nickname ? ' ⭐' : '';
+      return `<li>${i + 1}위 ${PET_EMOJI[r.pet] || '🐾'} ${escapeHtml(r.nickname)}` +
+        ` — Lv.${r.level} (${r.xp})${me}</li>`;
+    }).join('');
+  } catch (err) {
+    rankList.innerHTML = '<li>불러오기 실패 — 네트워크나 테이블을 확인해 주세요</li>';
+  }
+}
+
+// 일하는 중엔 5분마다 점수 자동 업로드
+setInterval(() => {
+  if (game.working) pushScore();
+}, 300000);
 
 const CELEBRATE_MS = 4000;
 
@@ -618,6 +787,7 @@ function finishTimer() {
   state.celebrateUntil = performance.now() + CELEBRATE_MS;
 
   const wasWork = timer.label !== '휴식';
+  if (wasWork) addXp(POMODORO_BONUS); // 뽀모도로 완주 보너스
   if (window.pet) {
     window.pet.notify(
       wasWork ? '🍅 집중 시간 완료!' : '☕ 휴식 끝!',
@@ -628,8 +798,67 @@ function finishTimer() {
 }
 
 /* ---- UI 배선 ---- */
+const rankPanel = document.getElementById('rank-panel');
+const nicknameInput = document.getElementById('nickname');
+nicknameInput.value = nickname;
+
 document.getElementById('btn-timer').addEventListener('click', () => {
+  rankPanel.classList.add('hidden');
   panel.classList.toggle('hidden');
+});
+
+document.getElementById('btn-rank').addEventListener('click', () => {
+  panel.classList.add('hidden');
+  rankPanel.classList.toggle('hidden');
+  if (!rankPanel.classList.contains('hidden')) loadRanking();
+});
+
+document.getElementById('btn-nick').addEventListener('click', () => {
+  const v = nicknameInput.value.trim().slice(0, 12);
+  if (!v) return;
+  nickname = v;
+  try { localStorage.setItem('nickname', v); } catch (_) { /* 무시 */ }
+  pushScore().then(loadRanking);
+});
+
+document.getElementById('btn-rank-refresh').addEventListener('click', loadRanking);
+
+const btnWork = document.getElementById('btn-work');
+const btnAway = document.getElementById('btn-away');
+
+btnWork.addEventListener('click', () => {
+  if (!game.working) {
+    game.working = true;
+    game.away = false;
+    game.sessionXp = 0;
+    game.sessionStart = Date.now();
+    btnWork.innerHTML = '&#9209;';
+    btnWork.title = '일 끝';
+    btnAway.classList.remove('hidden');
+    btnAway.classList.remove('on');
+    showToast('일 시작! 열심히 하면 펫이 자라요 💪');
+  } else {
+    const mins = Math.max(1, Math.round((Date.now() - game.sessionStart) / 60000));
+    const net = game.sessionXp >= 0 ? `+${game.sessionXp}` : `${game.sessionXp}`;
+    game.working = false;
+    game.away = false;
+    btnWork.innerHTML = '&#128188;';
+    btnWork.title = '일 시작';
+    btnAway.classList.add('hidden');
+    btnAway.classList.remove('on');
+    addXp(WORK_BONUS);
+    state.celebrateUntil = performance.now() + CELEBRATE_MS;
+    showToast(`일 끝! ${mins}분 · 세션 ${net}점 + 완주 보너스 ${WORK_BONUS}점`);
+    pushScore();
+  }
+  updateHud();
+});
+
+btnAway.addEventListener('click', () => {
+  if (!game.working) return;
+  game.away = !game.away;
+  btnAway.classList.toggle('on', game.away);
+  updateHud();
 });
 
 document.getElementById('btn-pet').addEventListener('click', () => {
@@ -673,6 +902,8 @@ document.getElementById('btn-reset').addEventListener('click', () => {
   bubble.classList.add('hidden');
   btnPause.textContent = '일시정지';
 });
+
+updateHud();
 
 // ?timer=25 로 실행하면 바로 타이머 시작 (테스트/스크린샷용)
 const DEMO_TIMER = params.get('timer');
