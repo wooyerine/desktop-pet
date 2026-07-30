@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Desktop Pet</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="bubble" class="hidden">
+      <span id="bubble-label"></span>
+      <span id="bubble-time">00:00</span>
+    </div>
+    <div id="nag" class="hidden"></div>
+
+    <canvas id="pet-canvas" width="352" height="192"></canvas>
+
+    <div id="bar">
+      <button id="btn-timer" title="뽀모도로 타이머">&#9200;</button>
+      <button id="btn-quit" title="종료">&#10005;</button>
+    </div>
+
+    <div id="panel" class="hidden">
+      <div class="panel-row">
+        <button class="preset" data-min="25" data-label="집중">집중 25분</button>
+        <button class="preset" data-min="5" data-label="휴식">휴식 5분</button>
+      </div>
+      <div class="panel-row">
+        <input id="custom-min" type="number" min="1" max="180" placeholder="분" />
+        <button id="btn-custom">시작</button>
+      </div>
+      <div class="panel-row">
+        <button id="btn-pause">일시정지</button>
+        <button id="btn-reset">리셋</button>
+      </div>
+      <div id="hint" class="hidden">
+        &#9888; 키보드 감지를 하려면<br/>시스템 설정 &gt; 개인정보 보호 및 보안 &gt;<br/>손쉬운 사용에서 이 앱(Electron)을<br/>허용한 뒤 재시작해 주세요.
+      </div>
+    </div>
+  </div>
+  <script src="pet.js"></script>
+</body>
+</html>
