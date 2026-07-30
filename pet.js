@@ -17,9 +17,15 @@ ctx.imageSmoothingEnabled = false;
 /* ---------------- 팔레트 ---------------- */
 const PAL = {
   k: '#1e1a1e', // 검정 테두리 / 눈 / 코
-  o: '#8e8e98', // 몸통 회색
-  O: '#5f5f6a', // 진한 회색 (귀 속 / 정수리 / 그늘)
-  c: '#bcbcc4', // 밝은 회색 (주둥이 / 발가락)
+  o: '#8e8e98', // 고양이 몸통 회색
+  O: '#5f5f6a', // 고양이 진한 회색 (귀 속 / 정수리 / 그늘)
+  c: '#bcbcc4', // 고양이 밝은 회색 (주둥이 / 발가락)
+  b: '#e0a55e', // 강아지 몸통 탄
+  e: '#8a5c33', // 강아지 귀 / 그늘 브라운
+  f: '#f4e6c8', // 강아지 크림 (주둥이 / 가슴)
+  p: '#e79aa8', // 분홍 (강아지 혀 / 토끼 귀 속 / 토끼 코)
+  w: '#f0ece2', // 토끼 몸통 웜 화이트
+  u: '#cfc6b8', // 토끼 그늘 베이지
   t: '#d98a3f', // 책상 오렌지
   T: '#a85f2a', // 책상 어두운 오렌지
   y: '#f7c948', // 책상 노란 포인트 / 스파클
@@ -85,7 +91,7 @@ function sprite4(grid, ox, oy) {
 
 /* ---------------- 고양이 (정면, 책상 뒤에 앉음) ----------------
  * 그리드 폭 20: 뾰족 귀 + 볼 털이 살짝 튀어나온 정면 실루엣 */
-const SIL = [
+const CAT_SIL = [
   [[4, 5], [14, 15]],           // 뾰족한 귀 끝
   [[3, 6], [13, 16]],
   [[3, 7], [12, 16]],           // 귀 밑동
@@ -104,7 +110,7 @@ const SIL = [
   [[2, 17]],                    // 책상 뒤로
 ];
 
-const PAINT = [
+const CAT_PAINT = [
   // 귀 속 어두운 색
   [1, 4, 5, 'O'], [1, 14, 15, 'O'],
   [2, 4, 6, 'O'], [2, 13, 15, 'O'],
@@ -131,11 +137,11 @@ const PAINT = [
 ];
 
 // 실루엣 → 그리드 (검정 테두리 자동 생성)
-function buildSprite(sil, paint) {
+function buildSprite(sil, paint, base) {
   const W = 22, H = sil.length + 2;
   const grid = Array.from({ length: H }, () => Array(W).fill('.'));
   sil.forEach((spans, i) => spans.forEach(([s, e]) => {
-    for (let x = s; x <= e; x++) grid[i + 1][x + 1] = 'o';
+    for (let x = s; x <= e; x++) grid[i + 1][x + 1] = base;
   }));
   paint.forEach(([r, s, e, ch]) => {
     for (let x = s; x <= e; x++) if (grid[r + 1][x + 1] !== '.') grid[r + 1][x + 1] = ch;
@@ -152,21 +158,132 @@ function buildSprite(sil, paint) {
   return grid.map((row) => row.join(''));
 }
 
-const CAT = buildSprite(SIL, PAINT);
+/* ---------------- 강아지 (정면, 처진 귀) ---------------- */
+const DOG_SIL = [
+  [[5, 14]],                    // 둥근 정수리
+  [[3, 16]],
+  [[1, 18]],                    // 귀가 양옆으로 처지기 시작
+  [[1, 18]],
+  [[1, 18]],                    // 눈 높이
+  [[1, 18]],
+  [[2, 17]],                    // 귀 끝, 볼
+  [[2, 17]],
+  [[3, 16]],                    // 턱
+  [[3, 16]],                    // 목
+  [[2, 17]],                    // 어깨
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],                    // 책상 뒤로
+];
+
+const DOG_PAINT = [
+  // 처진 귀 (양옆 브라운)
+  [2, 1, 3, 'e'], [2, 16, 18, 'e'],
+  [3, 1, 3, 'e'], [3, 16, 18, 'e'],
+  [4, 1, 3, 'e'], [4, 16, 18, 'e'],
+  [5, 1, 2, 'e'], [5, 17, 18, 'e'],
+  [6, 2, 2, 'e'], [6, 17, 17, 'e'],
+  // 이마 크림 블레이즈 → 주둥이로 이어짐
+  [2, 9, 10, 'f'], [3, 9, 10, 'f'], [4, 8, 11, 'f'],
+  [5, 8, 11, 'f'],
+  [6, 7, 12, 'f'],
+  [7, 6, 13, 'f'],
+  [8, 7, 12, 'f'],
+  // 크림 가슴
+  [12, 8, 11, 'f'],
+  [13, 7, 12, 'f'], [14, 7, 12, 'f'], [15, 7, 12, 'f'],
+  // 어깨/옆구리 그늘
+  [10, 2, 3, 'e'], [10, 16, 17, 'e'],
+  [11, 2, 3, 'e'], [11, 16, 17, 'e'],
+  [12, 2, 2, 'e'], [12, 17, 17, 'e'],
+  [13, 2, 2, 'e'], [13, 17, 17, 'e'],
+  [14, 2, 2, 'e'], [14, 17, 17, 'e'],
+  [15, 2, 2, 'e'], [15, 17, 17, 'e'],
+];
+
+/* ---------------- 토끼 (정면, 쫑긋 긴 귀) ---------------- */
+const RABBIT_SIL = [
+  [[5, 6], [13, 14]],           // 귀 끝
+  [[4, 6], [13, 15]],
+  [[4, 6], [13, 15]],
+  [[4, 6], [13, 15]],
+  [[4, 15]],                    // 귀 밑동, 머리 시작
+  [[3, 16]],
+  [[2, 17]],                    // 눈 높이
+  [[2, 17]],                    // 볼
+  [[3, 16]],                    // 턱
+  [[3, 16]],                    // 목
+  [[2, 17]],                    // 어깨
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],                    // 책상 뒤로
+];
+
+const RABBIT_PAINT = [
+  // 귀 속 분홍
+  [1, 5, 5, 'p'], [2, 5, 5, 'p'], [3, 5, 5, 'p'],
+  [1, 14, 14, 'p'], [2, 14, 14, 'p'], [3, 14, 14, 'p'],
+  // 볼/옆 그늘
+  [6, 2, 3, 'u'], [6, 16, 17, 'u'],
+  [7, 2, 3, 'u'], [7, 16, 17, 'u'],
+  // 어깨/옆구리 그늘
+  [10, 2, 3, 'u'], [10, 16, 17, 'u'],
+  [11, 2, 3, 'u'], [11, 16, 17, 'u'],
+  [12, 2, 2, 'u'], [12, 17, 17, 'u'],
+  [13, 2, 2, 'u'], [13, 17, 17, 'u'],
+  [14, 2, 2, 'u'], [14, 17, 17, 'u'],
+  [15, 2, 2, 'u'], [15, 17, 17, 'u'],
+  // 가슴 털 무늬
+  [12, 9, 10, 'u'],
+  [14, 6, 6, 'u'], [14, 13, 13, 'u'],
+];
+
+/* ---------------- 펫 정의 (🐾 버튼으로 교체) ---------------- */
+const PET_DEFS = {
+  cat: {
+    sprite: buildSprite(CAT_SIL, CAT_PAINT, 'o'),
+    paw: ['.kkk.', 'koook', 'kcook', '.kkk.'],
+    eyes: { lx: 6, rx: 12, y: 5 },
+    face(dy) {
+      // 까만 코
+      px(PET_X + 9, PET_Y + dy + 7, 'k');
+      px(PET_X + 10, PET_Y + dy + 7, 'k');
+    },
+  },
+  dog: {
+    sprite: buildSprite(DOG_SIL, DOG_PAINT, 'b'),
+    paw: ['.kkk.', 'kbbbk', 'kfbbk', '.kkk.'],
+    eyes: { lx: 6, rx: 12, y: 4 },
+    face(dy) {
+      // 큼직한 코 + 내민 혀
+      rect(PET_X + 9, PET_Y + dy + 6, 2, 1, 'k');
+      px(PET_X + 9, PET_Y + dy + 8, 'p');
+      px(PET_X + 10, PET_Y + dy + 8, 'p');
+    },
+  },
+  rabbit: {
+    sprite: buildSprite(RABBIT_SIL, RABBIT_PAINT, 'w'),
+    paw: ['.kkk.', 'kwwwk', 'kpwwk', '.kkk.'],
+    eyes: { lx: 6, rx: 12, y: 6 },
+    face(dy) {
+      // 분홍 코
+      px(PET_X + 9, PET_Y + dy + 8, 'p');
+      px(PET_X + 10, PET_Y + dy + 8, 'p');
+    },
+  },
+};
+
+const PET_ORDER = ['cat', 'dog', 'rabbit'];
 
 // 점 눈 (2x2)
 const EYE_OPEN = ['kk', 'kk'];
 const EYE_BLINK = ['..', 'kk'];
 const EYE_HAPPY = ['k.k'];
 const EYE_SLEEP = EYE_BLINK;
-
-// 앞발 (5x4, 테두리 포함 — 몸통과 겹쳐도 또렷하게)
-const PAW = [
-  '.kkk.',
-  'koook',
-  'kcook',
-  '.kkk.',
-];
 
 // 마우스 (절반 픽셀, 버튼 2개)
 const MOUSE_SPRITE = [
@@ -225,12 +342,11 @@ const PAW_REST = 13;
 const PAW_DOWN = 14;
 
 function renderPet(eye, dy) {
-  sprite(CAT, PET_X - 1, PET_Y - 1 + dy);
-  sprite(eye, PET_X + 6, PET_Y + dy + 5);
-  sprite(eye, PET_X + 12, PET_Y + dy + 5);
-  // 까만 코 (주둥이 중앙)
-  px(PET_X + 9, PET_Y + dy + 7, 'k');
-  px(PET_X + 10, PET_Y + dy + 7, 'k');
+  const P = PET_DEFS[petKind];
+  sprite(P.sprite, PET_X - 1, PET_Y - 1 + dy);
+  sprite(eye, PET_X + P.eyes.lx, PET_Y + dy + P.eyes.y);
+  sprite(eye, PET_X + P.eyes.rx, PET_Y + dy + P.eyes.y);
+  P.face(dy);
 }
 
 /* ---------------- 가구/소품 ---------------- */
@@ -297,6 +413,9 @@ const state = {
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating
+
+let petKind = params.get('pet') || localStorage.getItem('petKind') || 'cat';
+if (!PET_DEFS[petKind]) petKind = 'cat';
 
 const startTime = performance.now();
 
@@ -387,19 +506,20 @@ function render(now) {
   drawKeyboard();
   drawMouse(wiggle);
 
+  const paw = PET_DEFS[petKind].paw;
   if (mode === 'celebrating') {
-    sprite(PAW, PAW_L, PAW_REST - 2);
-    sprite(PAW, PAW_R, PAW_REST - 2);
+    sprite(paw, PAW_L, PAW_REST - 2);
+    sprite(paw, PAW_R, PAW_REST - 2);
   } else {
     // 타이핑 중엔 숨쉬기(dy)를 빼서 내려간 발과 쉬는 발이 항상 구분되게
     const restY = typing ? PAW_REST : PAW_REST + dy;
     const leftY = typing && state.pawFlip ? PAW_DOWN : restY;
-    sprite(PAW, PAW_L, leftY);
+    sprite(paw, PAW_L, leftY);
     if (mousing) {
-      sprite(PAW, PAW_MOUSE + wiggle / 2, PAW_DOWN); // 오른발이 마우스와 함께 움직임
+      sprite(paw, PAW_MOUSE + wiggle / 2, PAW_DOWN); // 오른발이 마우스와 함께 움직임
     } else {
       const rightY = typing && !state.pawFlip ? PAW_DOWN : restY;
-      sprite(PAW, PAW_R, rightY);
+      sprite(paw, PAW_R, rightY);
     }
   }
 
@@ -510,6 +630,11 @@ function finishTimer() {
 /* ---- UI 배선 ---- */
 document.getElementById('btn-timer').addEventListener('click', () => {
   panel.classList.toggle('hidden');
+});
+
+document.getElementById('btn-pet').addEventListener('click', () => {
+  petKind = PET_ORDER[(PET_ORDER.indexOf(petKind) + 1) % PET_ORDER.length];
+  try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
 });
 
 document.getElementById('btn-quit').addEventListener('click', () => {
