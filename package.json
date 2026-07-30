@@ -21,6 +21,7 @@
   "build": {
     "appId": "com.wooyerine.desktop-pet",
     "productName": "Desktop Pet",
+    "afterPack": "./scripts/adhoc-sign.js",
     "files": [
       "main.js",
       "preload.js",
