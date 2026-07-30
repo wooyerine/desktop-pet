@@ -1,20 +1,49 @@
 {
   "name": "desktop-pet",
   "version": "1.0.0",
-  "description": "",
+  "description": "픽셀 데스크탑 펫 — 같이 일하는 고양이/강아지/토끼",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --mac"
   },
   "keywords": [],
-  "author": "",
+  "author": "wooyerine",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^43.2.0"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "uiohook-napi": "^1.5.5"
+  },
+  "build": {
+    "appId": "com.wooyerine.desktop-pet",
+    "productName": "Desktop Pet",
+    "files": [
+      "main.js",
+      "preload.js",
+      "pet.js",
+      "index.html",
+      "style.css"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    }
   }
 }

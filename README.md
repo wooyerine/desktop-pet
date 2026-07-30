@@ -19,12 +19,23 @@
 - 🏆 랭킹: 닉네임을 저장하면 Supabase 리더보드에 참가 — 친구들과 레벨 경쟁!
   점수는 레벨 업 / 일 끝 / 일하는 중 5분마다 자동 업로드돼요
 
-## 실행
+## 설치 (친구용)
+
+[Releases](https://github.com/wooyerine/desktop-pet/releases)에서 `.dmg`를 받아
+`Desktop Pet.app`을 응용 프로그램에 드래그하면 끝이에요. Apple Silicon(M1 이상) 전용입니다.
+
+> ⚠️ 서명되지 않은 앱이라 처음 열 때 macOS가 차단해요.
+> **앱을 우클릭 → 열기**로 실행하거나, 터미널에서
+> `xattr -cr "/Applications/Desktop Pet.app"` 실행 후 여세요.
+
+## 개발용 실행
 
 ```bash
 npm install
 npm start
 ```
+
+배포 파일 빌드는 `npm run dist` (결과물은 `dist/`에 생성).
 
 ## macOS 권한
 
