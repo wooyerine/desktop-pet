@@ -150,25 +150,61 @@ button:active {
 }
 
 /* ---- 잔디밭 ----
- * 칸 색은 앱 팔레트에서 뽑았다 (휴식 초록 #3f9d4e, 파티 연두 #a7e0b8) */
+ * 깃허브 잔디와 같은 배치(월 표시 + 요일 + Less/More)와 초록 5단계.
+ * 개발자에게 익숙한 그림이라 굳이 다른 색을 쓰지 않았다 */
 .g {
-  border: 1px solid #1c1c1c;
-  background: #e6e0d2; /* 아무것도 안 한 날 = 흙 */
+  border-radius: 2px;
+  background: #ebedf0; /* 아무것도 안 한 날 */
+  box-shadow: inset 0 0 0 1px rgba(27, 31, 35, 0.06);
 }
-.g1 { background: #bfe6b8; }
-.g2 { background: #7fcb82; }
-.g3 { background: #4faa5a; }
-.g4 { background: #2c7a3f; }
+.g1 { background: #9be9a8; }
+.g2 { background: #40c463; }
+.g3 { background: #30a14e; }
+.g4 { background: #216e39; }
 .g.future { visibility: hidden; }
-.g.today { box-shadow: 0 0 0 1px #f7c948; }
+.g.today { box-shadow: inset 0 0 0 1px rgba(27, 31, 35, 0.06), 0 0 0 1px #1c1c1c; }
 
-#grass-grid {
+#grass-cal {
   display: grid;
-  grid-template-rows: repeat(7, 10px);
-  grid-auto-flow: column;
-  grid-auto-columns: 10px;
-  gap: 2px;
+  grid-template-columns: 12px auto;
+  grid-template-rows: auto auto;
+  column-gap: 3px;
+  row-gap: 2px;
   justify-content: center;
+}
+#grass-months {
+  grid-area: 1 / 2;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 9px;
+  gap: 2px;
+  height: 11px;
+  font-size: 8px;
+  color: #57606a;
+}
+#grass-months span {
+  grid-row: 1;
+  white-space: nowrap; /* 라벨이 다음 칸 위로 넘어가도 둔다 (깃허브도 같다) */
+}
+#grass-week {
+  grid-area: 2 / 1;
+  display: grid;
+  grid-template-rows: repeat(7, 9px);
+  gap: 2px;
+  font-size: 8px;
+  line-height: 9px;
+  color: #57606a;
+}
+#grass-week i:nth-child(1) { grid-row: 2; }
+#grass-week i:nth-child(2) { grid-row: 4; }
+#grass-week i:nth-child(3) { grid-row: 6; }
+#grass-grid {
+  grid-area: 2 / 2;
+  display: grid;
+  grid-template-rows: repeat(7, 9px);
+  grid-auto-flow: column;
+  grid-auto-columns: 9px;
+  gap: 2px;
 }
 .grass-head {
   display: flex;
@@ -180,12 +216,17 @@ button:active {
 .grass-legend {
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: space-between;
   font-size: 10px;
   color: #8a5f3c;
 }
-.grass-legend .g { width: 8px; height: 8px; }
-#grass-today { margin-left: auto; }
+.legend-scale {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #57606a;
+}
+.grass-legend .g { width: 9px; height: 9px; }
 
 /* 말풍선 안의 최근 7일 — 잔디 7칸이 붙으니 다른 말풍선보다 폭이 더 필요하다 */
 #brag {

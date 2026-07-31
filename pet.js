@@ -1053,6 +1053,7 @@ function finishTimer() {
 
 /* ---- 잔디밭 그리기 ---- */
 const grassGrid = document.getElementById('grass-grid');
+const grassMonths = document.getElementById('grass-months');
 const grassSum = document.getElementById('grass-sum');
 const grassStreak = document.getElementById('grass-streak');
 const grassToday = document.getElementById('grass-today');
@@ -1071,6 +1072,24 @@ function grassCell(d, todayKey) {
   return el;
 }
 
+/* 달이 바뀌는 주 위에 '8월'을 얹는다 (깃허브와 같은 방식).
+ * 마지막 한 주에 걸치는 라벨은 자리가 없어 넣지 않는다 */
+function renderMonths(firstSunday) {
+  const frag = document.createDocumentFragment();
+  let prev = -1;
+  for (let w = 0; w < GRASS_WEEKS; w++) {
+    const month = addDays(firstSunday, w * 7).getMonth();
+    if (month !== prev && w < GRASS_WEEKS - 1) {
+      const el = document.createElement('span');
+      el.textContent = `${month + 1}월`;
+      el.style.gridColumn = `${w + 1}`;
+      frag.appendChild(el);
+    }
+    prev = month;
+  }
+  grassMonths.replaceChildren(frag);
+}
+
 function renderGrass() {
   const today = new Date();
   const todayKey = dayKey(today);
@@ -1079,6 +1098,7 @@ function renderGrass() {
   const frag = document.createDocumentFragment();
   for (let i = 0; i < GRASS_WEEKS * 7; i++) frag.appendChild(grassCell(addDays(first, i), todayKey));
   grassGrid.replaceChildren(frag);
+  renderMonths(first);
 
   const streak = currentStreak();
   grassStreak.textContent = streak >= 2 ? `${streak}일 연속 🔥` : '';
