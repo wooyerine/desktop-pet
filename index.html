@@ -13,6 +13,10 @@
     </div>
     <div id="nag" class="hidden"></div>
     <div id="toast" class="hidden"></div>
+    <div id="brag" class="hidden">
+      <span id="brag-text"></span>
+      <span id="brag-grass"></span>
+    </div>
 
     <canvas id="pet-canvas" width="352" height="192"></canvas>
 
@@ -22,6 +26,7 @@
       <button id="btn-timer" title="뽀모도로 타이머">&#9200;</button>
       <button id="btn-rank" title="랭킹">&#127942;</button>
       <button id="btn-pet" title="펫 교체">&#128062;</button>
+      <button id="btn-grass" title="잔디밭">&#127793;</button>
       <button id="btn-quit" title="종료">&#10005;</button>
     </div>
 
@@ -46,6 +51,20 @@
       </div>
       <div id="hint" class="hidden">
         &#9888; 키보드 감지를 하려면<br/>시스템 설정 &gt; 개인정보 보호 및 보안 &gt;<br/>손쉬운 사용에서 이 앱(Electron)을<br/>허용한 뒤 재시작해 주세요.
+      </div>
+    </div>
+
+    <div id="grass-panel" class="hidden">
+      <div class="grass-head">
+        <span id="grass-sum">이번 주 0일</span>
+        <span id="grass-streak"></span>
+      </div>
+      <div id="grass-grid"></div>
+      <div class="grass-legend">
+        <span>적음</span>
+        <i class="g g0"></i><i class="g g1"></i><i class="g g2"></i><i class="g g3"></i><i class="g g4"></i>
+        <span>많음</span>
+        <span id="grass-today">오늘 0개</span>
       </div>
     </div>
 

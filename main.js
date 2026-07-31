@@ -20,7 +20,7 @@ const PET_SIZES = [
   { label: '보통', px: 6 },
   { label: '크게', px: 8 },
 ];
-const MIN_WIN_W = 268;              // 버튼 바(6개)가 잘리지 않는 최소 폭
+const MIN_WIN_W = 294;              // 버튼 바(자리 비움까지 7개)가 잘리지 않는 최소 폭
 const settings = { petPx: 8, onTop: true };
 const settingsPath = () => path.join(app.getPath('userData'), 'view.json');
 

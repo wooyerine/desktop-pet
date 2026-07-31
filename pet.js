@@ -450,16 +450,17 @@ function currentMode(now) {
 /* ---------------- 잔소리 말풍선 (키보드를 10분 이상 안 치면) ---------------- */
 const NAG_AFTER = 10 * 60000;
 const NAG_MESSAGES = [
-  '일해라 냥!',
-  '키보드가 식었다냥…',
-  '10분째 놀고 있다냥',
-  '슬슬 집중할 시간이다냥',
+  '일해라!',
+  '키보드가 식었다',
+  '10분째 멈춤',
+  '집중.',
 ];
 const nagEl = document.getElementById('nag');
 
 function updateNag(now) {
   const idle = now - Math.max(state.lastKey, startTime);
-  const timerBusy = timer.running || !bubble.classList.contains('hidden');
+  const timerBusy = timer.running ||
+    !bubble.classList.contains('hidden') || !bragEl.classList.contains('hidden');
   const show = DEMO === 'nag' ||
     (!DEMO && !timerBusy && !game.away && idle >= NAG_AFTER);
   if (show && nagEl.classList.contains('hidden')) {
@@ -467,6 +468,73 @@ function updateNag(now) {
   }
   nagEl.classList.toggle('hidden', !show);
   state.nagging = show;
+}
+
+/* ================================================================
+ * 잔디밭 — 하루에 완주한 집중 세션 수를 날짜별로 센다
+ *  { '2026-07-31': 3 } 형태로 저장, 오래된 날짜는 버린다
+ * ================================================================ */
+const GRASS_WEEKS = 16;                // 패널에 보여줄 주 수
+const GRASS_KEEP_DAYS = GRASS_WEEKS * 7 + 14;
+const POMO_MIN_MINUTES = 10;           // 1분 타이머로 잔디를 심는 어뷰징 방지
+const DAY_MS = 86400000;
+
+function dayKey(d) {
+  // 로컬 날짜 기준 (UTC로 하면 자정 전후로 하루가 밀린다)
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function loadGrass() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('pomoDays') || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+let grass = loadGrass();
+
+function saveGrass() {
+  const cutoff = dayKey(new Date(Date.now() - GRASS_KEEP_DAYS * DAY_MS));
+  for (const k of Object.keys(grass)) if (k < cutoff) delete grass[k]; // 'YYYY-MM-DD'는 문자열 비교로 충분
+  try { localStorage.setItem('pomoDays', JSON.stringify(grass)); } catch (_) { /* 무시 */ }
+}
+
+// 정오 기준으로 날짜를 옮긴다 — 밀리초를 더하면 서머타임에서 하루가 밀린다
+function addDays(base, n) {
+  const d = new Date(base);
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function daysAgo(n) {
+  return addDays(new Date(), -n);
+}
+
+function grassCount(d) {
+  return grass[dayKey(d)] || 0;
+}
+
+/* 오늘(오늘이 비었으면 어제)부터 거꾸로 이어진 날 수 */
+function currentStreak() {
+  const start = grassCount(new Date()) ? 0 : 1;
+  let n = 0;
+  for (let i = start; i < GRASS_KEEP_DAYS; i++) {
+    if (!grassCount(daysAgo(i))) break;
+    n++;
+  }
+  return n;
+}
+
+/* 이번 주(일요일 시작)에 하나라도 채운 날 수 */
+function thisWeekDays() {
+  let n = 0;
+  for (let i = 0; i <= new Date().getDay(); i++) if (grassCount(daysAgo(i))) n++;
+  return n;
 }
 
 /* ================================================================
@@ -850,6 +918,7 @@ function updateBubble() {
 function startTimer(minutes, label) {
   clearInterval(timer.tick);
   timer.label = label;
+  timer.minutes = minutes;
   timer.left = minutes * 60000;
   timer.endAt = Date.now() + timer.left;
   timer.running = true;
@@ -875,13 +944,90 @@ function finishTimer() {
 
   const wasWork = timer.label !== '휴식';
   if (wasWork) addXp(POMODORO_BONUS); // 뽀모도로 완주 보너스
+
+  // 잔디 한 칸 — 짧은 타이머로 심는 건 치지 않는다
+  const planted = wasWork && timer.minutes >= POMO_MIN_MINUTES;
+  if (planted) {
+    const k = dayKey(new Date());
+    grass[k] = (grass[k] || 0) + 1;
+    saveGrass();
+    if (!grassPanel.classList.contains('hidden')) renderGrass();
+  }
+
   if (window.pet) {
     window.pet.notify(
-      wasWork ? '🍅 집중 시간 완료!' : '☕ 휴식 끝!',
-      wasWork ? '수고했어요! 잠깐 쉬어 볼까요?' : '다시 집중할 시간이에요!'
+      wasWork ? '🍅 집중 완료' : '☕ 휴식 끝',
+      wasWork ? '잠깐 쉬어라' : '다시 집중'
     );
   }
-  setTimeout(() => bubble.classList.add('hidden'), CELEBRATE_MS);
+  setTimeout(() => {
+    bubble.classList.add('hidden');
+    if (planted) showBrag(); // 축하가 끝나면 자랑
+  }, CELEBRATE_MS);
+}
+
+/* ---- 잔디밭 그리기 ---- */
+const grassGrid = document.getElementById('grass-grid');
+const grassSum = document.getElementById('grass-sum');
+const grassStreak = document.getElementById('grass-streak');
+const grassToday = document.getElementById('grass-today');
+const bragEl = document.getElementById('brag');
+const bragText = document.getElementById('brag-text');
+const bragGrass = document.getElementById('brag-grass');
+
+function grassCell(d, todayKey) {
+  const k = dayKey(d);
+  const n = grass[k] || 0;
+  const el = document.createElement('i');
+  el.className = `g g${Math.min(4, n)}`;
+  if (k === todayKey) el.classList.add('today');
+  else if (k > todayKey) el.classList.add('future'); // 이번 주 남은 날은 빈자리로
+  el.title = `${k} · ${n}개`;
+  return el;
+}
+
+function renderGrass() {
+  const today = new Date();
+  const todayKey = dayKey(today);
+  // 왼쪽 위 칸 = 16주 전 그 주의 일요일
+  const first = addDays(today, -(today.getDay() + (GRASS_WEEKS - 1) * 7));
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < GRASS_WEEKS * 7; i++) frag.appendChild(grassCell(addDays(first, i), todayKey));
+  grassGrid.replaceChildren(frag);
+
+  const streak = currentStreak();
+  grassStreak.textContent = streak >= 2 ? `${streak}일 연속 🔥` : '';
+  grassSum.textContent = `이번 주 ${thisWeekDays()}일`;
+  grassToday.textContent = `오늘 ${grassCount(today)}개`;
+}
+
+/* ---- 안 물어봤는데 자랑하는 말풍선 ---- */
+const BRAG_MS = 6000;
+let bragTimer = null;
+
+function bragLine() {
+  const streak = currentStreak();
+  if (streak >= 2) return `${streak}일 연속! 🔥`;
+  const week = thisWeekDays();
+  if (week >= 2) return `이번 주 ${week}일`;
+  const today = grassCount(new Date());
+  if (today >= 2) return `오늘 ${today}개째`;
+  return today ? '오늘 1개' : '';
+}
+
+function showBrag() {
+  const line = bragLine();
+  // 타이머 말풍선이 떠 있으면 자리를 비켜 준다
+  if (!line || !bubble.classList.contains('hidden')) return;
+  bragText.textContent = line;
+  const todayKey = dayKey(new Date());
+  const frag = document.createDocumentFragment();
+  for (let i = 6; i >= 0; i--) frag.appendChild(grassCell(daysAgo(i), todayKey));
+  bragGrass.replaceChildren(frag);
+
+  bragEl.classList.remove('hidden');
+  clearTimeout(bragTimer);
+  bragTimer = setTimeout(() => bragEl.classList.add('hidden'), BRAG_MS);
 }
 
 /* ---- UI 배선 ---- */
@@ -896,15 +1042,24 @@ function setNickTaken(taken) {
   rankNote.classList.toggle('hidden', !taken);
 }
 
-document.getElementById('btn-timer').addEventListener('click', () => {
-  rankPanel.classList.add('hidden');
-  panel.classList.toggle('hidden');
-});
+const grassPanel = document.getElementById('grass-panel');
+
+/* 패널은 한 번에 하나만 */
+function openPanel(target) {
+  for (const p of [panel, rankPanel, grassPanel]) {
+    if (p !== target) p.classList.add('hidden');
+  }
+  return !target.classList.toggle('hidden');
+}
+
+document.getElementById('btn-timer').addEventListener('click', () => openPanel(panel));
 
 document.getElementById('btn-rank').addEventListener('click', () => {
-  panel.classList.add('hidden');
-  rankPanel.classList.toggle('hidden');
-  if (!rankPanel.classList.contains('hidden')) loadRanking();
+  if (openPanel(rankPanel)) loadRanking();
+});
+
+document.getElementById('btn-grass').addEventListener('click', () => {
+  if (openPanel(grassPanel)) renderGrass();
 });
 
 document.getElementById('btn-nick').addEventListener('click', async () => {
@@ -1094,6 +1249,13 @@ updateHud();
 updateCodeRow();
 syncOnStart();
 
+// 하루에 한 번, 앱을 처음 켤 때 잔디 자랑
+const bragDay = dayKey(new Date());
+if (!DEMO && localStorage.getItem('lastBragDay') !== bragDay) {
+  try { localStorage.setItem('lastBragDay', bragDay); } catch (_) { /* 무시 */ }
+  setTimeout(showBrag, 2500);
+}
+
 // ?timer=25 로 실행하면 바로 타이머 시작 (테스트/스크린샷용)
 const DEMO_TIMER = params.get('timer');
 if (DEMO_TIMER) startTimer(+DEMO_TIMER, '집중');
@@ -1106,6 +1268,11 @@ if (DEMO_PANEL === 'rank') {
   loadRanking();
 } else if (DEMO_PANEL === 'timer') {
   panel.classList.remove('hidden');
+} else if (DEMO_PANEL === 'grass') {
+  grassPanel.classList.remove('hidden');
+  renderGrass();
+} else if (DEMO_PANEL === 'brag') {
+  showBrag();
 }
 
 /* ---- 창을 내용 높이에 맞추기 ----

@@ -27,7 +27,8 @@ html, body {
 /* ---- 말풍선 (MEOW! 스타일: 흰 바탕 + 검정 픽셀 테두리) ---- */
 #bubble,
 #nag,
-#toast {
+#toast,
+#brag {
   /* 꼬리가 펫 머리 위에 오도록 캔버스 폭에 비례해 띄운다 (원래 352px 기준 90px).
      펫이 작아져도 말풍선이 창 밖으로 밀리지 않게 남는 폭을 190px 이상 남긴다 */
   --speech-left: min(
@@ -52,7 +53,8 @@ html, body {
 }
 #bubble::after,
 #nag::after,
-#toast::after {
+#toast::after,
+#brag::after {
   content: '';
   position: absolute;
   left: 38px;
@@ -123,7 +125,7 @@ html, body {
 #bar {
   -webkit-app-region: no-drag;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 button {
   -webkit-app-region: no-drag;
@@ -142,14 +144,68 @@ button:active {
   box-shadow: none;
 }
 #bar button {
-  width: 36px;
+  width: 34px;
   height: 30px;
   padding: 0;
 }
 
+/* ---- 잔디밭 ----
+ * 칸 색은 앱 팔레트에서 뽑았다 (휴식 초록 #3f9d4e, 파티 연두 #a7e0b8) */
+.g {
+  border: 1px solid #1c1c1c;
+  background: #e6e0d2; /* 아무것도 안 한 날 = 흙 */
+}
+.g1 { background: #bfe6b8; }
+.g2 { background: #7fcb82; }
+.g3 { background: #4faa5a; }
+.g4 { background: #2c7a3f; }
+.g.future { visibility: hidden; }
+.g.today { box-shadow: 0 0 0 1px #f7c948; }
+
+#grass-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 10px);
+  grid-auto-flow: column;
+  grid-auto-columns: 10px;
+  gap: 2px;
+  justify-content: center;
+}
+.grass-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: bold;
+  color: #1c1c1c;
+}
+.grass-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #8a5f3c;
+}
+.grass-legend .g { width: 8px; height: 8px; }
+#grass-today { margin-left: auto; }
+
+/* 말풍선 안의 최근 7일 — 잔디 7칸이 붙으니 다른 말풍선보다 폭이 더 필요하다 */
+#brag {
+  --speech-left: min(
+    calc(50% - var(--pet-w) / 2 + var(--pet-w) * 0.256),
+    max(0px, calc(100% - 250px))
+  );
+  gap: 6px;
+}
+#brag-text { white-space: nowrap; }
+#brag-grass {
+  display: flex;
+  gap: 2px;
+}
+#brag-grass .g { width: 11px; height: 11px; }
+
 /* ---- 설정/랭킹 패널 ---- */
 #panel,
-#rank-panel {
+#rank-panel,
+#grass-panel {
   -webkit-app-region: no-drag;
   display: flex;
   flex-direction: column;
