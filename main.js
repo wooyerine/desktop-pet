@@ -11,7 +11,7 @@ function send(type) {
 
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const W = 372, H = 560; // 랭킹 패널까지 잘리지 않는 높이
+  const W = 372, H = 640; // 랭킹 패널(코드/이어하기 포함)까지 잘리지 않는 높이
   win = new BrowserWindow({
     width: W,
     height: H,
@@ -34,6 +34,7 @@ function createWindow() {
   const q = [];
   if (process.env.DEMO) q.push(`demo=${process.env.DEMO}`);
   if (process.env.TIMER) q.push(`timer=${process.env.TIMER}`);
+  if (process.env.PANEL) q.push(`panel=${process.env.PANEL}`);
   win.loadFile('index.html', { search: q.length ? `?${q.join('&')}` : '' });
 
   if (process.env.SHOT) {

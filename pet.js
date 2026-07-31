@@ -536,21 +536,32 @@ setInterval(() => {
 }, 1000);
 
 /* ================================================================
- * 리더보드 (Supabase) — 친구들과 레벨 랭킹 경쟁
- * publishable(anon) 키는 공개용이고, 테이블 권한은 RLS로 제어
+ * 리더보드 & 동기화 (Supabase) — 닉네임 + 동기화 코드가 계정
+ * publishable(anon) 키는 공개용이고, 쓰기는 코드를 검증하는 RPC로만 가능
+ * 리더보드 행이 곧 클라우드 세이브 — 다른 PC에서 이어 키울 수 있다
  * ================================================================ */
 const SB_URL = 'https://qefrpkflpdpzxyrwyxvd.supabase.co';
 const SB_KEY = 'sb_publishable_epIs7YckEJ8ETJkrrUHKfw_lhH6FEMA';
 const SB_TABLE = 'leaderboard';
 const PET_EMOJI = { cat: '🐱', dog: '🐶', rabbit: '🐰' };
 
-// 기기별 고유 ID (내 점수 행을 구분하는 키)
-let deviceId = localStorage.getItem('deviceId');
-if (!deviceId) {
-  deviceId = crypto.randomUUID();
-  try { localStorage.setItem('deviceId', deviceId); } catch (_) { /* 무시 */ }
-}
 let nickname = localStorage.getItem('nickname') || '';
+let syncCode = localStorage.getItem('syncCode') || '';
+
+// 동기화 코드: 사람이 옮겨 적기 쉽게 8자 (O/0, I/1처럼 헷갈리는 문자 제외)
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function genSyncCode() {
+  const buf = new Uint32Array(8);
+  crypto.getRandomValues(buf);
+  const chars = [...buf].map((n) => CODE_ALPHABET[n % CODE_ALPHABET.length]);
+  return `${chars.slice(0, 4).join('')}-${chars.slice(4).join('')}`;
+}
+
+function normalizeCode(raw) {
+  const s = raw.toUpperCase().replace(/[^A-Z2-9]/g, '');
+  return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4)}` : raw.trim().toUpperCase();
+}
 
 async function sbFetch(path, opts = {}) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
@@ -567,24 +578,71 @@ async function sbFetch(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+function sbRpc(fn, args) {
+  return sbFetch(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) });
+}
+
 async function pushScore() {
-  if (!nickname) return;
+  if (!nickname || !syncCode) return false;
   try {
-    await sbFetch(`${SB_TABLE}?on_conflict=device_id`, {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify({
-        device_id: deviceId,
-        nickname,
-        level: game.level,
-        xp: game.xp,
-        pet: petKind,
-        updated_at: new Date().toISOString(),
-      }),
+    const res = await sbRpc('upsert_score', {
+      p_nickname: nickname,
+      p_secret: syncCode,
+      p_level: game.level,
+      p_xp: game.xp,
+      p_pet: petKind,
     });
+    if (res && res.error) {
+      if (res.error === 'nickname_taken') {
+        showToast('이미 다른 사람이 쓰는 닉네임이에요 — 다른 닉네임으로 저장해 주세요');
+      }
+      return false;
+    }
+    if (res && res.updated_at) {
+      try { localStorage.setItem('lastPushAt', res.updated_at); } catch (_) { /* 무시 */ }
+    }
+    return true;
   } catch (err) {
     console.error('점수 업로드 실패:', err.message);
+    return false;
   }
+}
+
+// 서버에 저장된 상태를 이 PC에 반영
+function adoptState(s) {
+  game.level = Math.max(1, +s.level || 1);
+  game.xp = Math.max(0, +s.xp || 0);
+  if (PET_DEFS[s.pet]) {
+    petKind = s.pet;
+    try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
+  }
+  saveGame();
+  try { localStorage.setItem('lastPushAt', s.updated_at || ''); } catch (_) { /* 무시 */ }
+  updateHud();
+}
+
+// 시작 시 동기화: 다른 PC가 더 최근에 저장했으면 서버 상태를 가져온다
+async function syncOnStart() {
+  if (!nickname) return;
+  if (!syncCode) {
+    // v1 사용자: 코드를 만들어 기존 랭킹 행을 선점한다
+    syncCode = genSyncCode();
+    try { localStorage.setItem('syncCode', syncCode); } catch (_) { /* 무시 */ }
+    if (await pushScore()) {
+      showToast('동기화 코드가 생겼어요 — 랭킹 패널에서 확인하세요 🔑');
+    }
+    updateCodeRow();
+    return;
+  }
+  try {
+    const res = await sbRpc('get_state', { p_nickname: nickname, p_secret: syncCode });
+    if (!res || res.error) return;
+    const lastPush = localStorage.getItem('lastPushAt') || '';
+    // 같은 서버가 찍은 ISO 타임스탬프라 문자열 비교로 충분
+    if (lastPush && res.updated_at <= lastPush) return; // 이 PC가 최신
+    adoptState(res);
+    showToast('다른 PC의 진행 상황을 불러왔어요 ✨');
+  } catch (_) { /* 오프라인 등 — 로컬 유지 */ }
 }
 
 function escapeHtml(s) {
@@ -606,7 +664,7 @@ async function loadRanking() {
       return;
     }
     rankList.innerHTML = rows.map((r, i) => {
-      const me = r.nickname === nickname ? ' ⭐' : '';
+      const me = r.nickname.toLowerCase() === nickname.toLowerCase() ? ' ⭐' : '';
       return `<li>${i + 1}위 ${PET_EMOJI[r.pet] || '🐾'} ${escapeHtml(r.nickname)}` +
         ` — Lv.${r.level} (${r.xp})${me}</li>`;
     }).join('');
@@ -814,15 +872,88 @@ document.getElementById('btn-rank').addEventListener('click', () => {
   if (!rankPanel.classList.contains('hidden')) loadRanking();
 });
 
-document.getElementById('btn-nick').addEventListener('click', () => {
+document.getElementById('btn-nick').addEventListener('click', async () => {
   const v = nicknameInput.value.trim().slice(0, 12);
   if (!v) return;
+  const firstTime = !syncCode;
   nickname = v;
   try { localStorage.setItem('nickname', v); } catch (_) { /* 무시 */ }
-  pushScore().then(loadRanking);
+  if (!syncCode) {
+    syncCode = genSyncCode();
+    try { localStorage.setItem('syncCode', syncCode); } catch (_) { /* 무시 */ }
+  }
+  const ok = await pushScore();
+  if (ok) {
+    showToast(firstTime
+      ? `등록 완료! 동기화 코드 ${syncCode} — 다른 PC에서 이어 키울 때 필요해요`
+      : '저장 완료!');
+  }
+  updateCodeRow();
+  loadRanking();
 });
 
 document.getElementById('btn-rank-refresh').addEventListener('click', loadRanking);
+
+/* ---- 동기화 코드 표시 / 다른 PC에서 이어하기 ---- */
+const codeRow = document.getElementById('code-row');
+const codeText = document.getElementById('code-text');
+const btnCodeShow = document.getElementById('btn-code-show');
+let codeVisible = false;
+
+function updateCodeRow() {
+  codeRow.classList.toggle('hidden', !syncCode);
+  codeText.textContent = codeVisible ? syncCode : '••••-••••';
+  btnCodeShow.textContent = codeVisible ? '가리기' : '보기';
+}
+
+btnCodeShow.addEventListener('click', () => {
+  codeVisible = !codeVisible;
+  updateCodeRow();
+});
+
+document.getElementById('btn-code-copy').addEventListener('click', async () => {
+  if (!syncCode) return;
+  try {
+    await navigator.clipboard.writeText(syncCode);
+    showToast('동기화 코드를 복사했어요');
+  } catch (_) {
+    codeVisible = true;
+    updateCodeRow();
+  }
+});
+
+const linkBox = document.getElementById('link-box');
+
+document.getElementById('btn-link-toggle').addEventListener('click', () => {
+  linkBox.classList.toggle('hidden');
+});
+
+document.getElementById('btn-link').addEventListener('click', async () => {
+  const nick = document.getElementById('link-nick').value.trim();
+  const code = normalizeCode(document.getElementById('link-code').value);
+  if (!nick || !code) return;
+  try {
+    const res = await sbRpc('get_state', { p_nickname: nick, p_secret: code });
+    if (!res || res.error) {
+      showToast('닉네임 또는 코드가 맞지 않아요');
+      return;
+    }
+    nickname = res.nickname || nick;
+    syncCode = code;
+    try {
+      localStorage.setItem('nickname', nickname);
+      localStorage.setItem('syncCode', syncCode);
+    } catch (_) { /* 무시 */ }
+    nicknameInput.value = nickname;
+    adoptState(res);
+    linkBox.classList.add('hidden');
+    updateCodeRow();
+    showToast(`${nickname}의 펫을 불러왔어요! 🎉`);
+    loadRanking();
+  } catch (_) {
+    showToast('불러오기 실패 — 네트워크를 확인해 주세요');
+  }
+});
 
 const btnWork = document.getElementById('btn-work');
 const btnAway = document.getElementById('btn-away');
@@ -869,12 +1000,18 @@ btnAway.addEventListener('click', () => {
   updateHud();
 });
 
+let petPushTimer = null;
 document.getElementById('btn-pet').addEventListener('click', () => {
   petKind = PET_ORDER[(PET_ORDER.indexOf(petKind) + 1) % PET_ORDER.length];
   try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
+  // 연타하며 고를 수 있으니 멈춘 뒤 한 번만 업로드
+  clearTimeout(petPushTimer);
+  petPushTimer = setTimeout(pushScore, 2000);
 });
 
-document.getElementById('btn-quit').addEventListener('click', () => {
+document.getElementById('btn-quit').addEventListener('click', async () => {
+  // 마지막 상태를 서버에 남기고 종료 (오프라인이어도 1.5초 뒤엔 그냥 종료)
+  await Promise.race([pushScore(), new Promise((r) => setTimeout(r, 1500))]);
   if (window.pet) window.pet.quit();
   else window.close();
 });
@@ -912,7 +1049,19 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 });
 
 updateHud();
+updateCodeRow();
+syncOnStart();
 
 // ?timer=25 로 실행하면 바로 타이머 시작 (테스트/스크린샷용)
 const DEMO_TIMER = params.get('timer');
 if (DEMO_TIMER) startTimer(+DEMO_TIMER, '집중');
+
+// ?panel=rank|timer 로 실행하면 패널이 열린 상태로 시작 (테스트/스크린샷용)
+const DEMO_PANEL = params.get('panel');
+if (DEMO_PANEL === 'rank') {
+  rankPanel.classList.remove('hidden');
+  linkBox.classList.remove('hidden');
+  loadRanking();
+} else if (DEMO_PANEL === 'timer') {
+  panel.classList.remove('hidden');
+}

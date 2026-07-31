@@ -155,7 +155,9 @@ button:active {
   font-size: 12px;
   color: #1c1c1c;
 }
-#nickname {
+#nickname,
+#link-nick,
+#link-code {
   flex: 1;
   min-width: 0;
   font-family: inherit;
@@ -164,6 +166,31 @@ button:active {
   background: #ffffff;
   border: 3px solid #1c1c1c;
   padding: 4px 6px;
+}
+
+/* ---- 동기화 코드 / 이어하기 ---- */
+#code-row {
+  align-items: center;
+  font-size: 11px;
+  color: #1c1c1c;
+}
+.code-label { font-weight: bold; white-space: nowrap; }
+#code-text {
+  flex: 1;
+  letter-spacing: 1px;
+}
+#code-row button {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+#btn-link-toggle { font-size: 11px; }
+#link-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 3px solid #1c1c1c;
+  padding-top: 8px;
 }
 .panel-row {
   display: flex;

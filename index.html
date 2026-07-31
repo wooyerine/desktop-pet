@@ -54,9 +54,25 @@
         <input id="nickname" type="text" maxlength="12" placeholder="닉네임" />
         <button id="btn-nick">저장</button>
       </div>
+      <div id="code-row" class="panel-row hidden">
+        <span class="code-label">내 코드</span>
+        <span id="code-text">••••-••••</span>
+        <button id="btn-code-show">보기</button>
+        <button id="btn-code-copy">복사</button>
+      </div>
       <ol id="rank-list"></ol>
       <div class="panel-row">
         <button id="btn-rank-refresh">새로고침</button>
+        <button id="btn-link-toggle">다른 PC에서 이어하기</button>
+      </div>
+      <div id="link-box" class="hidden">
+        <div class="panel-row">
+          <input id="link-nick" type="text" maxlength="12" placeholder="닉네임" />
+        </div>
+        <div class="panel-row">
+          <input id="link-code" type="text" maxlength="9" placeholder="동기화 코드" />
+          <button id="btn-link">불러오기</button>
+        </div>
       </div>
     </div>
   </div>
