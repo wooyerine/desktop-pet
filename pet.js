@@ -6,13 +6,17 @@
  *  - 뽀모도로 타이머 내장
  * ================================================================ */
 
-const SCALE = 8;
 const SCENE_W = 44;
 const SCENE_H = 24;
 
+/* 픽셀 한 칸의 크기. 메뉴바에서 4/6/8로 바꾼다 —
+ * 페이지를 줌으로 줄이면 글씨까지 작아지므로 도트 크기만 건드린다.
+ * 짝수만 쓰는 이유: 소품이 절반 칸(HALF)을 쓰기 때문 */
+let SCALE = 8;
+let HALF = 4;
+
 const canvas = document.getElementById('pet-canvas');
 const ctx = canvas.getContext('2d');
-ctx.imageSmoothingEnabled = false;
 
 /* ---------------- 팔레트 ---------------- */
 const PAL = {
@@ -68,8 +72,6 @@ function sprite(grid, ox, oy) {
 }
 
 /* 소품용 절반 픽셀 (고양이는 큼직하게, 소품은 알아볼 수 있게 잘게) */
-const HALF = SCALE / 2;
-
 function rect4(x, y, w, h, color) {
   ctx.fillStyle = PAL[color] || color;
   ctx.fillRect(x * HALF, y * HALF, w * HALF, h * HALF);
@@ -413,6 +415,22 @@ const state = {
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating
+
+/* ---- 펫 크기 (메뉴바에서 변경) ----
+ * 캔버스 자체를 도트 크기에 맞춰 다시 잡아 준다. CSS로 줄이면 도트가
+ * 뭉개지지만, 칸 크기를 줄이면 어느 크기에서도 픽셀이 또렷하다. */
+function setPetSize(px) {
+  SCALE = [4, 6, 8].includes(px) ? px : 8;
+  HALF = SCALE / 2;
+  canvas.width = SCENE_W * SCALE;
+  canvas.height = SCENE_H * SCALE;
+  ctx.imageSmoothingEnabled = false; // 캔버스 크기를 바꾸면 초기화된다
+  // 말풍선 꼬리가 펫 머리 위에 오도록 CSS에서 쓰는 폭
+  document.documentElement.style.setProperty('--pet-w', `${canvas.width}px`);
+}
+
+setPetSize(+params.get('pet_px') || 8);
+if (window.pet) window.pet.onPetSize(setPetSize);
 
 let petKind = params.get('pet') || localStorage.getItem('petKind') || 'cat';
 if (!PET_DEFS[petKind]) petKind = 'cat';
@@ -1065,3 +1083,19 @@ if (DEMO_PANEL === 'rank') {
 } else if (DEMO_PANEL === 'timer') {
   panel.classList.remove('hidden');
 }
+
+/* ---- 창을 내용 높이에 맞추기 ----
+ * 창이 내용보다 크면 남는 투명 영역이 그 자리의 다른 앱 클릭을 가로챈다.
+ * 패널을 열고 닫을 때마다 실제 높이를 재서 메인에 알려 준다 */
+const appEl = document.getElementById('app');
+let lastFitH = 0;
+
+function reportFit() {
+  const h = Math.ceil(appEl.getBoundingClientRect().height);
+  if (h === lastFitH || !window.pet) return;
+  lastFitH = h;
+  window.pet.fit(h);
+}
+
+new ResizeObserver(reportFit).observe(appEl);
+reportFit();
