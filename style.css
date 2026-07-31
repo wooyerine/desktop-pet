@@ -221,7 +221,8 @@ button:active {
   padding: 4px 6px;
   text-align: center;
 }
-#hint {
+#hint,
+#rank-note {
   color: #8a5f3c;
   font-size: 10px;
   line-height: 1.6;

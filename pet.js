@@ -600,7 +600,9 @@ function sbRpc(fn, args) {
   return sbFetch(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) });
 }
 
-async function pushScore() {
+/* 점수 업로드. interactive는 "사용자가 방금 저장을 눌렀다"는 뜻 —
+ * 펫 교체나 자동 저장 같은 배경 업로드가 뜬금없이 말풍선을 띄우면 안 된다 */
+async function pushScore({ interactive = false } = {}) {
   if (!nickname || !syncCode) return false;
   try {
     const res = await sbRpc('upsert_score', {
@@ -612,10 +614,14 @@ async function pushScore() {
     });
     if (res && res.error) {
       if (res.error === 'nickname_taken') {
-        showToast('이미 다른 사람이 쓰는 닉네임이에요 — 다른 닉네임으로 저장해 주세요');
+        setNickTaken(true);
+        if (interactive) {
+          showToast('이미 다른 사람이 쓰는 닉네임이에요 — 다른 닉네임으로 저장해 주세요');
+        }
       }
       return false;
     }
+    setNickTaken(false);
     if (res && res.updated_at) {
       try { localStorage.setItem('lastPushAt', res.updated_at); } catch (_) { /* 무시 */ }
     }
@@ -643,11 +649,15 @@ function adoptState(s) {
 async function syncOnStart() {
   if (!nickname) return;
   if (!syncCode) {
-    // v1 사용자: 코드를 만들어 기존 랭킹 행을 선점한다
+    // v1 사용자: 코드를 만들어 기존 랭킹 행을 선점한다.
+    // 서버가 받아 준 뒤에 저장한다 — 거절당한 코드를 들고 있으면
+    // 그 뒤로 업로드가 조용히 계속 실패한다
     syncCode = genSyncCode();
-    try { localStorage.setItem('syncCode', syncCode); } catch (_) { /* 무시 */ }
     if (await pushScore()) {
+      try { localStorage.setItem('syncCode', syncCode); } catch (_) { /* 무시 */ }
       showToast('동기화 코드가 생겼어요 — 랭킹 패널에서 확인하세요 🔑');
+    } else {
+      syncCode = '';
     }
     updateCodeRow();
     return;
@@ -877,7 +887,14 @@ function finishTimer() {
 /* ---- UI 배선 ---- */
 const rankPanel = document.getElementById('rank-panel');
 const nicknameInput = document.getElementById('nickname');
+const rankNote = document.getElementById('rank-note');
 nicknameInput.value = nickname;
+
+/* 업로드가 닉네임 충돌로 막혔음을 랭킹 패널에서 알려 준다 —
+ * 배경 업로드는 말풍선을 띄우지 않으니 여기가 유일한 단서다 */
+function setNickTaken(taken) {
+  rankNote.classList.toggle('hidden', !taken);
+}
 
 document.getElementById('btn-timer').addEventListener('click', () => {
   rankPanel.classList.add('hidden');
@@ -893,18 +910,25 @@ document.getElementById('btn-rank').addEventListener('click', () => {
 document.getElementById('btn-nick').addEventListener('click', async () => {
   const v = nicknameInput.value.trim().slice(0, 12);
   if (!v) return;
+  // 서버가 받아 준 뒤에 저장한다 — 남의 닉네임을 로컬에 남겨두면
+  // 이후 업로드가 계속 거절당한다
+  const prevNick = nickname;
   const firstTime = !syncCode;
   nickname = v;
-  try { localStorage.setItem('nickname', v); } catch (_) { /* 무시 */ }
-  if (!syncCode) {
-    syncCode = genSyncCode();
-    try { localStorage.setItem('syncCode', syncCode); } catch (_) { /* 무시 */ }
-  }
-  const ok = await pushScore();
+  if (firstTime) syncCode = genSyncCode();
+
+  const ok = await pushScore({ interactive: true });
   if (ok) {
+    try {
+      localStorage.setItem('nickname', nickname);
+      if (firstTime) localStorage.setItem('syncCode', syncCode);
+    } catch (_) { /* 무시 */ }
     showToast(firstTime
       ? `등록 완료! 동기화 코드 ${syncCode} — 다른 PC에서 이어 키울 때 필요해요`
       : '저장 완료!');
+  } else {
+    nickname = prevNick;
+    if (firstTime) syncCode = '';
   }
   updateCodeRow();
   loadRanking();
