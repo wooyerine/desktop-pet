@@ -471,12 +471,14 @@ function updateNag(now) {
 }
 
 /* ================================================================
- * 잔디밭 — 하루에 완주한 집중 세션 수를 날짜별로 센다
- *  { '2026-07-31': 3 } 형태로 저장, 오래된 날짜는 버린다
+ * 잔디밭 — 완주한 집중 시간(분)을 날짜별로 쌓는다
+ *  { '2026-07-31': 75 } 형태. 여러 PC를 오가도 하루치가 합산되도록
+ *  기기별로 나눠 저장하고 서버가 더한다 (깃허브 잔디처럼)
  * ================================================================ */
 const GRASS_WEEKS = 16;                // 패널에 보여줄 주 수
 const GRASS_KEEP_DAYS = GRASS_WEEKS * 7 + 14;
 const POMO_MIN_MINUTES = 10;           // 1분 타이머로 잔디를 심는 어뷰징 방지
+const POMO_UNIT = 25;                  // 색 한 단계 = 25분 (기본 뽀모도로 길이)
 const DAY_MS = 86400000;
 
 function dayKey(d) {
@@ -486,22 +488,55 @@ function dayKey(d) {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-function loadGrass() {
+function loadDays(key) {
   try {
-    const raw = JSON.parse(localStorage.getItem('pomoDays') || '{}');
+    const raw = JSON.parse(localStorage.getItem(key) || '{}');
     return raw && typeof raw === 'object' ? raw : {};
   } catch (_) {
     return {};
   }
 }
 
-let grass = loadGrass();
+/* 이 PC가 심은 집중 시간(분)과, 서버가 알려 준 "다른 PC들의 합"을 따로 둔다.
+ * 이렇게 해야 같은 날 데스크탑 50분 + 노트북 25분 = 75분으로 합산되고,
+ * 오프라인일 때도 내 몫을 바로 더해서 보여줄 수 있다 */
+let pomoMine = loadDays('pomoMine');
+let pomoOthers = loadDays('pomoOthers');
 
-function saveGrass() {
-  const cutoff = dayKey(new Date(Date.now() - GRASS_KEEP_DAYS * DAY_MS));
-  for (const k of Object.keys(grass)) if (k < cutoff) delete grass[k]; // 'YYYY-MM-DD'는 문자열 비교로 충분
-  try { localStorage.setItem('pomoDays', JSON.stringify(grass)); } catch (_) { /* 무시 */ }
+// 기기 구분용 — 서버는 기기별로 나눠 담았다가 날짜별로 더한다
+let deviceId = localStorage.getItem('deviceId') || '';
+if (!deviceId) {
+  deviceId = [...crypto.getRandomValues(new Uint32Array(4))]
+    .map((n) => n.toString(36)).join('');
+  try { localStorage.setItem('deviceId', deviceId); } catch (_) { /* 무시 */ }
 }
+
+function pruneDays(days) {
+  const cutoff = dayKey(new Date(Date.now() - GRASS_KEEP_DAYS * DAY_MS));
+  for (const k of Object.keys(days)) if (k < cutoff) delete days[k]; // 'YYYY-MM-DD'는 문자열 비교로 충분
+  return days;
+}
+
+function savePomoMine() {
+  try { localStorage.setItem('pomoMine', JSON.stringify(pruneDays(pomoMine))); } catch (_) { /* 무시 */ }
+}
+
+function savePomoOthers() {
+  try { localStorage.setItem('pomoOthers', JSON.stringify(pruneDays(pomoOthers))); } catch (_) { /* 무시 */ }
+}
+
+// v1.3.0은 "하루에 완주한 개수"를 셌다 — 한 개를 기본 뽀모도로 길이로 환산해 옮긴다
+(function migrateCounts() {
+  const old = localStorage.getItem('pomoDays');
+  if (!old || localStorage.getItem('pomoMine')) return;
+  try {
+    for (const [k, v] of Object.entries(JSON.parse(old))) {
+      pomoMine[k] = (Math.max(0, +v) || 0) * POMO_UNIT;
+    }
+    savePomoMine();
+    localStorage.removeItem('pomoDays');
+  } catch (_) { /* 무시 */ }
+})();
 
 // 정오 기준으로 날짜를 옮긴다 — 밀리초를 더하면 서머타임에서 하루가 밀린다
 function addDays(base, n) {
@@ -515,16 +550,23 @@ function daysAgo(n) {
   return addDays(new Date(), -n);
 }
 
-function grassCount(d) {
-  return grass[dayKey(d)] || 0;
+/* 그날의 집중 시간(분) — 이 PC + 다른 PC들 */
+function dayMinutes(d) {
+  const k = dayKey(d);
+  return (pomoMine[k] || 0) + (pomoOthers[k] || 0);
+}
+
+/* 잔디 색 단계: 25분마다 한 단계씩 진해지고 100분부터는 제일 진하다 */
+function grassLevel(minutes) {
+  return minutes <= 0 ? 0 : Math.min(4, Math.ceil(minutes / POMO_UNIT));
 }
 
 /* 오늘(오늘이 비었으면 어제)부터 거꾸로 이어진 날 수 */
 function currentStreak() {
-  const start = grassCount(new Date()) ? 0 : 1;
+  const start = dayMinutes(new Date()) ? 0 : 1;
   let n = 0;
   for (let i = start; i < GRASS_KEEP_DAYS; i++) {
-    if (!grassCount(daysAgo(i))) break;
+    if (!dayMinutes(daysAgo(i))) break;
     n++;
   }
   return n;
@@ -533,7 +575,7 @@ function currentStreak() {
 /* 이번 주(일요일 시작)에 하나라도 채운 날 수 */
 function thisWeekDays() {
   let n = 0;
-  for (let i = 0; i <= new Date().getDay(); i++) if (grassCount(daysAgo(i))) n++;
+  for (let i = 0; i <= new Date().getDay(); i++) if (dayMinutes(daysAgo(i))) n++;
   return n;
 }
 
@@ -668,18 +710,30 @@ function sbRpc(fn, args) {
   return sbFetch(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) });
 }
 
+// 서버가 아직 잔디 칼럼을 모르는 경우(스키마 미적용) 점수까지 막히지 않게 한 번만 물러선다
+let pomoSyncOff = false;
+
 /* 점수 업로드. interactive는 "사용자가 방금 저장을 눌렀다"는 뜻 —
  * 펫 교체나 자동 저장 같은 배경 업로드가 뜬금없이 말풍선을 띄우면 안 된다 */
 async function pushScore({ interactive = false } = {}) {
   if (!nickname || !syncCode) return false;
+  const args = {
+    p_nickname: nickname,
+    p_secret: syncCode,
+    p_level: game.level,
+    p_xp: game.xp,
+    p_pet: petKind,
+  };
+  const withPomo = { ...args, p_device: deviceId, p_pomo: pomoMine };
   try {
-    const res = await sbRpc('upsert_score', {
-      p_nickname: nickname,
-      p_secret: syncCode,
-      p_level: game.level,
-      p_xp: game.xp,
-      p_pet: petKind,
-    });
+    let res;
+    try {
+      res = await sbRpc('upsert_score', pomoSyncOff ? args : withPomo);
+    } catch (err) {
+      if (pomoSyncOff || !`${err.message}`.includes('404')) throw err;
+      pomoSyncOff = true; // 옛 스키마 — 잔디 없이 다시
+      res = await sbRpc('upsert_score', args);
+    }
     if (res && res.error) {
       if (res.error === 'nickname_taken') {
         setNickTaken(true);
@@ -693,11 +747,38 @@ async function pushScore({ interactive = false } = {}) {
     if (res && res.updated_at) {
       try { localStorage.setItem('lastPushAt', res.updated_at); } catch (_) { /* 무시 */ }
     }
+    if (res) adoptOthers(res.pomo_others);
     return true;
   } catch (err) {
     console.error('점수 업로드 실패:', err.message);
     return false;
   }
+}
+
+/* 저장된 상태 조회. 기기를 알려 주면 서버가 "나를 뺀 나머지 합"을 돌려준다 */
+async function fetchState(nick, code) {
+  const args = { p_nickname: nick, p_secret: code };
+  try {
+    return await sbRpc('get_state', pomoSyncOff ? args : { ...args, p_device: deviceId });
+  } catch (err) {
+    if (pomoSyncOff || !`${err.message}`.includes('404')) throw err;
+    pomoSyncOff = true; // 옛 스키마 — 잔디 없이
+    return sbRpc('get_state', args);
+  }
+}
+
+/* 서버가 알려 준 "다른 PC들의 합"을 통째로 갈아 끼운다 —
+ * 내 몫은 따로 들고 있으므로 합치지 않고 교체하는 게 맞다 */
+function adoptOthers(remote) {
+  if (!remote || typeof remote !== 'object') return;
+  const next = {};
+  for (const [k, v] of Object.entries(remote)) {
+    const n = Math.max(0, Math.floor(+v) || 0);
+    if (n > 0) next[k] = n;
+  }
+  pomoOthers = next;
+  savePomoOthers();
+  if (!grassPanel.classList.contains('hidden')) renderGrass();
 }
 
 // 서버에 저장된 상태를 이 PC에 반영
@@ -708,6 +789,7 @@ function adoptState(s) {
     petKind = s.pet;
     try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
   }
+  adoptOthers(s.pomo_others);
   saveGame();
   try { localStorage.setItem('lastPushAt', s.updated_at || ''); } catch (_) { /* 무시 */ }
   updateHud();
@@ -731,8 +813,10 @@ async function syncOnStart() {
     return;
   }
   try {
-    const res = await sbRpc('get_state', { p_nickname: nickname, p_secret: syncCode });
+    const res = await fetchState(nickname, syncCode);
     if (!res || res.error) return;
+    // 잔디는 레벨보다 먼저 받는다 — 이 PC가 최신이어도 다른 PC가 심어 둔 날이 있을 수 있다
+    adoptOthers(res.pomo_others);
     const lastPush = localStorage.getItem('lastPushAt') || '';
     // 같은 서버가 찍은 ISO 타임스탬프라 문자열 비교로 충분
     if (lastPush && res.updated_at <= lastPush) return; // 이 PC가 최신
@@ -949,9 +1033,10 @@ function finishTimer() {
   const planted = wasWork && timer.minutes >= POMO_MIN_MINUTES;
   if (planted) {
     const k = dayKey(new Date());
-    grass[k] = (grass[k] || 0) + 1;
-    saveGrass();
+    pomoMine[k] = (pomoMine[k] || 0) + timer.minutes;
+    savePomoMine();
     if (!grassPanel.classList.contains('hidden')) renderGrass();
+    pushScore(); // 다른 PC에서도 보이게 바로 올린다
   }
 
   if (window.pet) {
@@ -977,12 +1062,12 @@ const bragGrass = document.getElementById('brag-grass');
 
 function grassCell(d, todayKey) {
   const k = dayKey(d);
-  const n = grass[k] || 0;
+  const min = dayMinutes(d);
   const el = document.createElement('i');
-  el.className = `g g${Math.min(4, n)}`;
+  el.className = `g g${grassLevel(min)}`;
   if (k === todayKey) el.classList.add('today');
   else if (k > todayKey) el.classList.add('future'); // 이번 주 남은 날은 빈자리로
-  el.title = `${k} · ${n}개`;
+  el.title = `${k} · ${min}분`;
   return el;
 }
 
@@ -998,7 +1083,7 @@ function renderGrass() {
   const streak = currentStreak();
   grassStreak.textContent = streak >= 2 ? `${streak}일 연속 🔥` : '';
   grassSum.textContent = `이번 주 ${thisWeekDays()}일`;
-  grassToday.textContent = `오늘 ${grassCount(today)}개`;
+  grassToday.textContent = `오늘 ${dayMinutes(today)}분`;
 }
 
 /* ---- 안 물어봤는데 자랑하는 말풍선 ---- */
@@ -1008,11 +1093,10 @@ let bragTimer = null;
 function bragLine() {
   const streak = currentStreak();
   if (streak >= 2) return `${streak}일 연속! 🔥`;
+  const today = dayMinutes(new Date());
+  if (today) return `오늘 ${today}분`;
   const week = thisWeekDays();
-  if (week >= 2) return `이번 주 ${week}일`;
-  const today = grassCount(new Date());
-  if (today >= 2) return `오늘 ${today}개째`;
-  return today ? '오늘 1개' : '';
+  return week >= 2 ? `이번 주 ${week}일` : '';
 }
 
 function showBrag() {
@@ -1130,7 +1214,7 @@ document.getElementById('btn-link').addEventListener('click', async () => {
   const code = normalizeCode(document.getElementById('link-code').value);
   if (!nick || !code) return;
   try {
-    const res = await sbRpc('get_state', { p_nickname: nick, p_secret: code });
+    const res = await fetchState(nick, code);
     if (!res || res.error) {
       showToast('닉네임 또는 코드가 맞지 않아요');
       return;
