@@ -884,14 +884,18 @@ const CELEBRATE_MS = 4000;
 const SAD_MS = 4000;
 
 /* ---------------- 렌더 루프 ----------------
- * 애니메이션 최소 단위가 90ms(축하 바운스)라 60fps는 낭비 —
- * 80ms(~12.5fps)로 제한해 CPU/GPU 사용량을 줄인다 */
+ * 가만히 있을 땐 80ms(~12.5fps)로 제한해 CPU/GPU를 아끼고,
+ * 타이핑/마우스/축하/시무룩 중엔 33ms(~30fps)로 올린다 —
+ * 발 콩콩이 키 입력마다 토글이라 낮은 fps에선 프레임 사이에 뭉개진다 */
 const FRAME_MS = 80;
+const FRAME_ACTIVE_MS = 33;
 let lastFrame = 0;
 
 function render(now) {
   requestAnimationFrame(render);
-  if (now - lastFrame < FRAME_MS) return;
+  const active = now - state.lastKey < 600 || now - state.lastMouse < 600 ||
+    now < state.celebrateUntil || now < state.sadUntil;
+  if (now - lastFrame < (active ? FRAME_ACTIVE_MS : FRAME_MS)) return;
   lastFrame = now;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -999,8 +1003,16 @@ if (window.pet) {
     }
   });
 
-  window.pet.status().then(({ accessibilityOK }) => {
-    if (!accessibilityOK) document.getElementById('hint').classList.remove('hidden');
+  window.pet.status().then(({ accessibilityOK, platform }) => {
+    if (accessibilityOK) return;
+    const hint = document.getElementById('hint');
+    // 기본 문구는 macOS 손쉬운 사용 안내 — 다른 OS에선 권한 문제가 아니다
+    if (platform && platform !== 'darwin') {
+      hint.innerHTML = '&#9888; 키보드 감지를 시작하지 못했어요.<br/>' +
+        '앱을 재설치해 보고, 그래도 안 되면<br/>' +
+        '%APPDATA%\\Desktop Pet\\hook-error.log<br/>파일을 개발자에게 보내주세요.';
+    }
+    hint.classList.remove('hidden');
   });
 }
 

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen, Notification, systemPreferences, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen, Notification, systemPreferences, shell, dialog, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -147,19 +147,25 @@ const TRAY_ART = [
 function trayImage() {
   const Z = 2; // 레티나 대비 2배로 그리고 scaleFactor로 되돌린다
   const size = TRAY_ART.length * Z;
+  // macOS는 템플릿 이미지(알파만 사용)라 메뉴바 밝기에 맞춰 자동 반전되지만,
+  // 윈도우/리눅스는 그대로 그려지므로 다크 테마 트레이에선 흰색으로 채운다
+  const isMac = process.platform === 'darwin';
+  const white = !isMac && nativeTheme.shouldUseDarkColors;
   const buf = Buffer.alloc(size * size * 4); // BGRA
   TRAY_ART.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       if (row[x] !== '#') continue;
       for (let dy = 0; dy < Z; dy++) {
         for (let dx = 0; dx < Z; dx++) {
-          buf[(((y * Z + dy) * size) + x * Z + dx) * 4 + 3] = 255; // 불투명 검정
+          const i = (((y * Z + dy) * size) + x * Z + dx) * 4;
+          if (white) buf[i] = buf[i + 1] = buf[i + 2] = 255;
+          buf[i + 3] = 255;
         }
       }
     }
   });
   const img = nativeImage.createFromBitmap(buf, { width: size, height: size, scaleFactor: Z });
-  img.setTemplateImage(true);
+  img.setTemplateImage(isMac);
   return img;
 }
 
@@ -184,8 +190,39 @@ function refreshTrayMenu() {
     { type: 'separator' },
     { label: '제자리로 (오른쪽 아래)', click: moveToCorner },
     { type: 'separator' },
+    { label: '게임 규칙', click: showManual },
+    { type: 'separator' },
     { label: '종료', click: () => app.quit() },
   ]));
+}
+
+/* 규칙 숫자는 pet.js의 상수와 맞춰 둔다 (NAG_AFTER, WORK_BONUS, XP_PER_LEVEL …) */
+function showManual() {
+  dialog.showMessageBox({
+    type: 'none',
+    title: '게임 규칙',
+    message: '펫 키우기 규칙',
+    buttons: ['닫기'],
+    detail: [
+      '💼 일하는 중 (💼 버튼으로 시작/끝)',
+      '  · 타이핑하면 +1점/초',
+      '  · 1분 넘게 방치해 펫이 잠들면 -1점/초',
+      '  · 키보드를 10분 이상 안 쳐서 잔소리가 뜨면 -2점/초',
+      '  · ☕ 자리 비움을 켜면 증감과 잔소리가 멈춰요',
+      '',
+      '🏅 보너스',
+      '  · 일 끝: 10분 이상 + 점수가 늘어난 세션이면 +50',
+      '  · 뽀모도로 집중 완주: +100',
+      '',
+      '📈 레벨',
+      '  · 레벨 업에 레벨×1000점 필요',
+      '  · 점수가 바닥나면 레벨 강등 TㅁT (세션당 한 번, Lv.1이 바닥)',
+      '',
+      '🌱 잔디',
+      '  · 10분 이상 뽀모도로 집중을 완주하면 그날 잔디에 분이 쌓여요',
+      '  · 여러 PC에서 키우면 같은 날짜로 합산됩니다',
+    ].join('\n'),
+  });
 }
 
 function moveToCorner() {
@@ -226,6 +263,10 @@ function startInputHooks() {
       hook = uIOhook;
     } catch (err) {
       console.error('uiohook failed, falling back to cursor polling:', err.message);
+      // 패키징된 앱은 콘솔이 없다 — 원인을 파일로 남겨야 배포 후에도 추적할 수 있다
+      try {
+        fs.writeFileSync(path.join(app.getPath('userData'), 'hook-error.log'), String(err.stack || err));
+      } catch (_) { /* 무시 */ }
       accessibilityOK = false;
     }
   }
@@ -258,7 +299,7 @@ app.on('will-quit', () => {
   try { if (hook) hook.stop(); } catch (_) { /* 무시 */ }
 });
 
-ipcMain.handle('status', () => ({ accessibilityOK }));
+ipcMain.handle('status', () => ({ accessibilityOK, platform: process.platform }));
 
 // 렌더러가 잰 실제 내용 높이에 창을 맞춘다 —
 // 남는 투명 영역이 없어야 그 자리의 다른 앱을 클릭할 수 있다
