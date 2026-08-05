@@ -25,6 +25,7 @@
 - 💼 키우기: 일 시작 후 타이핑하면 +1/초, 잠들면 -1/초, 잔소리 뜨면 -2/초.
   완주 보너스 +50은 10분 이상 + 순증가 세션에만, 뽀모도로 완주 +100.
   레벨 업(레벨×1000점)하면 펫이 폴짝폴짝!
+  점수가 바닥나면 레벨도 떨어져요 — "레벨 떨어졌다 TㅁT" (세션당 한 번, Lv.1이 바닥)
   ☕ 자리 비움을 켜면 점수 증감과 잔소리가 멈춰요. 레벨/경험치는 저장됩니다
 - 🏆 랭킹: 닉네임을 저장하면 Supabase 리더보드에 참가 — 친구들과 레벨 경쟁!
   닉네임은 선착순 고유(대소문자 무시)라 남의 닉네임은 쓸 수 없어요.
@@ -98,7 +99,7 @@ publishable(anon) 키는 클라이언트 공개용이라 저장소에 넣어도 
 ### 디버그
 
 ```bash
-DEMO=typing npm start        # typing | mousing | sleeping | celebrating | nag
+DEMO=typing npm start        # typing | mousing | sleeping | celebrating | sad | nag
 TIMER=25 npm start           # 타이머가 시작된 상태로 실행
 PANEL=rank npm start         # rank | timer 패널이 열린 상태로 실행
 SHOT=/tmp/pet.png npm start  # 1.2초 후 스크린샷 찍고 종료

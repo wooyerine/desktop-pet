@@ -286,6 +286,7 @@ const EYE_OPEN = ['kk', 'kk'];
 const EYE_BLINK = ['..', 'kk'];
 const EYE_HAPPY = ['k.k'];
 const EYE_SLEEP = EYE_BLINK;
+const EYE_SAD = ['kkk', '.k.', '.z.']; // TㅁT — T자 눈 + 눈물
 
 // 마우스 (절반 픽셀, 버튼 2개)
 const MOUSE_SPRITE = [
@@ -409,12 +410,13 @@ const state = {
   blinkUntil: 0,
   nextBlink: performance.now() + 2500,
   celebrateUntil: 0,
+  sadUntil: 0,
   nagging: false,
   mode: 'idle',
 };
 
 const params = new URLSearchParams(location.search);
-const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating
+const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating | sad
 
 /* ---- 펫 크기 (메뉴바에서 변경) ----
  * 캔버스 자체를 도트 크기에 맞춰 다시 잡아 준다. CSS로 줄이면 도트가
@@ -440,6 +442,7 @@ const startTime = performance.now();
 function currentMode(now) {
   if (DEMO) return DEMO;
   if (now < state.celebrateUntil) return 'celebrating';
+  if (now < state.sadUntil) return 'sad';
   if (now - state.lastKey < 400) return 'typing';
   if (now - state.lastMouse < 450) return 'mousing';
   if (now - Math.max(state.lastKey, state.lastMouse, startTime) > 60000 &&
@@ -596,6 +599,7 @@ const game = {
   away: false,
   sessionXp: 0,
   sessionStart: 0,
+  demoted: false, // 이번 세션에서 강등됐는가 — 세션당 한 번만 떨어진다
 };
 
 const hudLevel = document.getElementById('hud-level');
@@ -624,16 +628,34 @@ function updateHud() {
 }
 
 function addXp(n) {
-  game.xp = Math.max(0, game.xp + n);
+  game.xp += n;
   let leveled = false;
   while (game.xp >= XP_PER_LEVEL(game.level)) {
     game.xp -= XP_PER_LEVEL(game.level);
     game.level += 1;
     leveled = true;
   }
+  // 강등 — 세션당 한 번, Lv.1이 바닥. 그 밖엔 0에서 버틴다
+  let dropped = false;
+  if (game.xp < 0) {
+    if (game.level > 1 && !game.demoted) {
+      game.level -= 1;
+      game.xp += XP_PER_LEVEL(game.level);
+      game.demoted = true;
+      dropped = true;
+    } else {
+      game.xp = 0;
+    }
+  }
   if (leveled) {
     state.celebrateUntil = performance.now() + CELEBRATE_MS;
     if (window.pet) window.pet.notify('🎉 레벨 업!', `펫이 Lv.${game.level}이 되었어요!`);
+    pushScore();
+  }
+  if (dropped) {
+    state.sadUntil = performance.now() + SAD_MS;
+    showToast('레벨 떨어졌다 TㅁT');
+    if (window.pet) window.pet.notify('레벨 떨어졌다 TㅁT', `지금 Lv.${game.level}.`);
     pushScore();
   }
   saveGame();
@@ -859,6 +881,7 @@ setInterval(() => {
 }, 300000);
 
 const CELEBRATE_MS = 4000;
+const SAD_MS = 4000;
 
 /* ---------------- 렌더 루프 ----------------
  * 애니메이션 최소 단위가 90ms(축하 바운스)라 60fps는 낭비 —
@@ -883,6 +906,7 @@ function render(now) {
     bounce = Math.sin(now / 90) > 0 ? -1 : 0;
     breathe = 0;
   }
+  if (mode === 'sad') breathe = 1; // 축 처진 자세
   const dy = breathe + bounce;
 
   drawFloorShadow();
@@ -890,6 +914,7 @@ function render(now) {
   let eye = EYE_OPEN;
   if (mode === 'sleeping') eye = EYE_SLEEP;
   else if (mode === 'celebrating') eye = EYE_HAPPY;
+  else if (mode === 'sad') eye = EYE_SAD;
   else {
     if (now > state.nextBlink) {
       state.blinkUntil = now + 140;
@@ -904,7 +929,7 @@ function render(now) {
   // 키보드가 더 최근 입력이면 타이핑이 양발을 차지한다 —
   // 커서가 살짝만 떨려도 오른발이 마우스에 붙잡혀 있던 문제 방지
   const mousing = mode === 'mousing' ||
-    (mode !== 'sleeping' && mode !== 'celebrating' &&
+    (mode !== 'sleeping' && mode !== 'celebrating' && mode !== 'sad' &&
      now - state.lastMouse < 450 && state.lastMouse > state.lastKey);
   const wiggle = mousing ? (Math.sin(now / 120) > 0 ? 1 : 0) : 0;
 
@@ -942,6 +967,14 @@ function render(now) {
     const phase = Math.floor(now / 700) % 2;
     sprite(Z_SMALL, 31, 1 - phase);
     if (phase) sprite(Z_BIG, 35, 0);
+  }
+
+  if (mode === 'sad') {
+    // 볼을 타고 떨어지는 눈물
+    const P = PET_DEFS[petKind];
+    const drop = Math.floor(now / 350) % 2;
+    px(PET_X + P.eyes.lx + 1, PET_Y + dy + P.eyes.y + 3 + drop, 'z');
+    px(PET_X + P.eyes.rx + 1, PET_Y + dy + P.eyes.y + 3 + drop, 'z');
   }
 
   if (mode === 'celebrating') {
@@ -1265,6 +1298,7 @@ btnWork.addEventListener('click', () => {
     game.away = false;
     game.sessionXp = 0;
     game.sessionStart = Date.now();
+    game.demoted = false;
     btnWork.innerHTML = '&#9209;';
     btnWork.title = '일 끝';
     btnAway.classList.remove('hidden');
