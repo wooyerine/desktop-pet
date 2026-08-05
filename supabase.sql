@@ -1,9 +1,17 @@
--- 리더보드 스키마 v3 — 닉네임 계정 + 동기화 코드 + 잔디밭
--- (Supabase 대시보드 > SQL Editor에서 1회 실행. v1/v2에서 업그레이드해도,
+-- 리더보드 스키마 v4 — 닉네임 계정 + 동기화 코드 + 잔디밭
+-- (Supabase 대시보드 > SQL Editor에서 1회 실행. v1/v2/v3에서 업그레이드해도,
 --  새 프로젝트에 처음 실행해도 동작한다)
 --
 -- 닉네임이 곧 계정: lower(nickname) 고유, 비밀(동기화 코드)은 해시로 저장.
 -- 쓰기는 아래 RPC 함수로만 가능하고, 함수 안에서 코드를 검증한다.
+--
+-- v4에서 고친 것 — 동기화 코드가 털릴 수 있던 구멍 두 개:
+--   1) 읽기 정책이 테이블 전체였다. 공개 키로 secret_hash까지 조회됐다.
+--      → 컬럼 단위 권한으로 랭킹에 필요한 칸만 읽게 한다.
+--   2) 솔트 없는 SHA-256이라 코드 규칙(8자, 31자 알파벳)만 알면
+--      GPU로 전수 대입이 몇 분이면 끝났다. → bcrypt로 바꾼다.
+--      기존 행은 그 사람이 다음에 접속해 코드를 맞히는 순간 자동 승급된다
+--      (해시만 갖고는 원본 코드를 알 수 없으니 한꺼번에 못 바꾼다).
 
 create extension if not exists pgcrypto with schema extensions;
 
@@ -62,6 +70,38 @@ drop policy if exists "누구나 등록" on public.leaderboard;
 drop policy if exists "누구나 갱신" on public.leaderboard;
 create policy "누구나 읽기" on public.leaderboard
   for select using (true);
+
+-- 읽을 수 있는 "칸"을 랭킹에 필요한 것만으로 좁힌다.
+-- RLS 정책은 행 단위라 컬럼을 못 가린다 — secret_hash(계정 비밀)와
+-- pomo_by_device(기기 목록)는 공개 키로 조회되면 안 되므로 권한에서 뺀다.
+-- 아래 RPC들은 security definer라 소유자 권한으로 돌아 그대로 동작한다.
+revoke all on public.leaderboard from anon, authenticated;
+grant select (nickname, level, xp, pet, updated_at)
+  on public.leaderboard to anon, authenticated;
+
+-- 동기화 코드 해시 — 새로 만드는 건 bcrypt(솔트 자동 포함)
+create or replace function public.hash_secret(p_secret text)
+returns text
+language sql
+volatile  -- gen_salt()가 매번 다른 값을 낸다
+set search_path = public, extensions
+as $$
+  select extensions.crypt(p_secret, extensions.gen_salt('bf', 10));
+$$;
+
+-- 검증 — 아직 승급 전인 레거시 SHA-256 행도 받아 준다
+create or replace function public.verify_secret(p_secret text, p_hash text)
+returns boolean
+language sql
+stable
+set search_path = public, extensions
+as $$
+  select case
+    when p_hash is null or p_secret is null then false
+    when left(p_hash, 1) = '$' then p_hash = extensions.crypt(p_secret, p_hash)
+    else p_hash = encode(extensions.digest(p_secret, 'sha256'), 'hex')
+  end;
+$$;
 
 -- 기기 하나가 올린 기록 정리 — 공개 키로 호출되므로 형식/개수/범위를 여기서 막는다
 create or replace function public.clean_pomo(p_days jsonb)
@@ -132,7 +172,6 @@ begin
      or p_pet not in ('cat', 'dog', 'rabbit') then
     return jsonb_build_object('error', 'bad_input');
   end if;
-  v_hash := encode(digest(p_secret, 'sha256'), 'hex');
 
   select * into v_row from public.leaderboard
     where lower(nickname) = lower(v_nick);
@@ -158,12 +197,18 @@ begin
   if not found then
     begin
       insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device)
-      values (v_nick, v_hash, p_level, p_xp, p_pet, v_devices)
+      values (v_nick, public.hash_secret(p_secret), p_level, p_xp, p_pet, v_devices)
       returning * into v_row;
     exception when unique_violation then
       return jsonb_build_object('error', 'nickname_taken');
     end;
-  elsif v_row.secret_hash is null or v_row.secret_hash = v_hash then
+  elsif v_row.secret_hash is null or public.verify_secret(p_secret, v_row.secret_hash) then
+    -- 비어 있거나 아직 SHA-256인 행은 이번 접속에 bcrypt로 승급한다
+    v_hash := case
+      when v_row.secret_hash is null or left(v_row.secret_hash, 1) <> '$'
+        then public.hash_secret(p_secret)
+      else v_row.secret_hash
+    end;
     update public.leaderboard
       set nickname = v_nick, secret_hash = v_hash,
           level = p_level, xp = p_xp, pet = p_pet,
@@ -200,9 +245,9 @@ begin
     return jsonb_build_object('error', 'not_found');
   end if;
   select * into v_row from public.leaderboard
-    where lower(nickname) = lower(trim(p_nickname))
-      and secret_hash = encode(digest(p_secret, 'sha256'), 'hex');
-  if not found then
+    where lower(nickname) = lower(trim(p_nickname));
+  -- 코드가 틀렸는지 없는 닉네임인지 구분해 주지 않는다 (계정 존재 여부도 정보다)
+  if not found or not public.verify_secret(p_secret, v_row.secret_hash) then
     return jsonb_build_object('error', 'not_found');
   end if;
   return jsonb_build_object(
@@ -215,3 +260,13 @@ begin
   );
 end;
 $$;
+
+-- 앱이 부르는 건 upsert_score / get_state 둘뿐이다. 나머지 도우미 함수는
+-- security definer 안에서만 쓰이므로 밖에서 부를 수 있게 열어 둘 이유가 없다.
+-- public까지 회수해야 한다 — 함수 실행은 기본이 PUBLIC 허용이라
+-- anon/authenticated만 지우면 그대로 호출된다. 소유자로 도는
+-- security definer 함수들은 이 회수와 무관하게 계속 부를 수 있다.
+revoke execute on function public.hash_secret(text) from public, anon, authenticated;
+revoke execute on function public.verify_secret(text, text) from public, anon, authenticated;
+revoke execute on function public.clean_pomo(jsonb) from public, anon, authenticated;
+revoke execute on function public.sum_pomo(jsonb, text) from public, anon, authenticated;
