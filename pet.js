@@ -35,6 +35,7 @@ const PAL = {
   j: '#8a5c36', // 해달 몸통 브라운 (따뜻한 초콜릿 — 회갈색이면 원숭이 같다)
   J: '#5c3a22', // 해달 진한 브라운 (귀 / 발 / 그늘)
   i: '#efe2c8', // 해달 크림 (얼굴 / 가슴)
+  q: '#8d4a63', // 군고구마 껍질 자주
   t: '#d98a3f', // 책상 오렌지
   T: '#a85f2a', // 책상 어두운 오렌지
   y: '#f7c948', // 책상 노란 포인트 / 스파클
@@ -387,6 +388,7 @@ const PET_DEFS = {
     sprite: buildSprite(CAT_SIL, CAT_PAINT, 'o'),
     paw: ['.kkk.', 'koook', 'kcook', '.kkk.'],
     eyes: { lx: 6, rx: 12, y: 5 },
+    acc: { l: 2, r: 17, top: 3 },
     face(dy) {
       // 까만 코
       px(PET_X + 9, PET_Y + dy + 7, 'k');
@@ -397,6 +399,7 @@ const PET_DEFS = {
     sprite: buildSprite(DOG_SIL, DOG_PAINT, 'b'),
     paw: ['.kkk.', 'kbbbk', 'kfbbk', '.kkk.'],
     eyes: { lx: 6, rx: 12, y: 4 },
+    acc: { l: 1, r: 18, top: 0 },
     face(dy) {
       // 큼직한 코 + 내민 혀
       rect(PET_X + 9, PET_Y + dy + 6, 2, 1, 'k');
@@ -408,6 +411,7 @@ const PET_DEFS = {
     sprite: buildSprite(RABBIT_SIL, RABBIT_PAINT, 'w'),
     paw: ['.kkk.', 'kwwwk', 'kpwwk', '.kkk.'],
     eyes: { lx: 6, rx: 12, y: 6 },
+    acc: { l: 2, r: 17, top: 4 },
     face(dy) {
       // 분홍 코
       px(PET_X + 9, PET_Y + dy + 8, 'p');
@@ -418,6 +422,7 @@ const PET_DEFS = {
     sprite: buildSprite(HAMSTER_SIL, HAMSTER_PAINT, 'n'),
     paw: ['.kkk.', 'knnnk', 'kpnnk', '.kkk.'],
     eyes: { lx: 6, rx: 12, y: 4 },
+    acc: { l: 2, r: 17, top: 2 },
     face(dy) {
       // 아주 작은 코 — 눈 바로 아래, 금색/흰색 경계에
       rect(PET_X + 9, PET_Y + dy + 6, 2, 1, 'k');
@@ -427,6 +432,7 @@ const PET_DEFS = {
     sprite: buildSprite(OTTER_SIL, OTTER_PAINT, 'j'),
     paw: ['.kkk.', 'kjjjk', 'kJjjk', '.kkk.'],
     eyes: { lx: 4, rx: 10, y: 4 },
+    acc: { l: 0, r: 15, top: 2 },
     face(dy) {
       // 작은 코 + ω 미소 (양쪽 입꼬리 점) — 머리가 2칸 왼쪽이라 같이 이동
       rect(PET_X + 7, PET_Y + dy + 6, 2, 1, 'k');
@@ -481,6 +487,170 @@ const CUP = [
   '.kkkkkkk.',
 ];
 
+/* ---------------- 책상 소품 (절반 픽셀, 컵 자리에 그린다) ----------------
+ * 레벨을 올리면 하나씩 열리는 데스크 꾸미기 아이템들 */
+
+// 해바라기씨 — 뾰족한 끝이 위로 선 두 개, 둘째는 낮게 비스듬히
+const SEEDS = [
+  '....k.............',
+  '...kCk............',
+  '..kCkCk......k....',
+  '.kCkmkCk....kCk...',
+  'kCkkmkkCk..kCkCk..',
+  'kCkkmkkCk.kCkmkCk.',
+  'kCkkmkkCk.kCkmkCk.',
+  '.kCCCCCk.kCkkmkkCk',
+  '..kkkkk..kCkkmkkCk',
+  '..........kCCCCCk.',
+  '...........kkkkk..',
+];
+
+// 은빛 가리비 조개 (해달 취향) — 부챗살이 꼭지로 모인다
+const CLAM = [
+  '....kkkkk....',
+  '..kkmmmmmkk..',
+  '.kmmmGmGmmmk.',
+  'kmmmGmmmGmmmk',
+  'kmmGmmmmmGmmk',
+  'kmmGmmmmmGmmk',
+  '.kmGmmmmmGmk.',
+  '..kmGmmmGmk..',
+  '...kkGGGkk...',
+  '..kGGGGGGGk..',
+  '..kkkkkkkkk..',
+];
+
+// 껍질을 반쯤 깐 군고구마 — 비스듬한 고구마, 위쪽만 노란 속
+const GOGUMA = [
+  '....kkk..',
+  '...kyyyk.',
+  '..kyyyyk.',
+  '.kqyyyyk.',
+  '.kqqyyk..',
+  'kqqqqqk..',
+  'kqqqqk...',
+  '.kkkk....',
+];
+
+// 군고구마 김 — 뜨거움 표시, 세로 두 줄기가 번갈아 굽이친다
+const STEAM_A = [
+  '.aa..aa',
+  'aa..aa.',
+  'aa..aa.',
+  '.aa..aa',
+];
+const STEAM_B = [
+  'aa..aa.',
+  '.aa..aa',
+  '.aa..aa',
+  'aa..aa.',
+];
+
+// 미니 탁상선풍기 — 참고 이미지처럼 격자 케이지 + 파란 날개 + 주황 받침.
+// 케이지 안은 투명이라 진짜 철망처럼 뒤가 비쳐 보인다
+const FAN_A = [
+  '...kkkkk...',
+  '..k..z..k..',
+  '.k...z...k.',
+  '.k.k.z.k.k.',
+  'k....z....k',
+  'kzzzzGzzzzk',
+  'k....z....k',
+  '.k.k.z.k.k.',
+  '.k...z...k.',
+  '..k..z..k..',
+  '...kkkkk...',
+  '....ktk....',
+  '...kttttk..',
+  '..kTTTTTTk.',
+  '..kkkkkkkk.',
+];
+const FAN_B = [
+  '...kkkkk...',
+  '..k.....k..',
+  '.k.z...z.k.',
+  '.k.zz.zz.k.',
+  'k...z.z...k',
+  'k..k.G.k..k',
+  'k...z.z...k',
+  '.k.zz.zz.k.',
+  '.k.z...z.k.',
+  '..k.....k..',
+  '...kkkkk...',
+  '....ktk....',
+  '...kttttk..',
+  '..kTTTTTTk.',
+  '..kkkkkkkk.',
+];
+
+/* ---------------- 꾸미기 아이템 목록 (레벨로 잠금 해제) ---------------- */
+const DESK_ITEMS = {
+  coffee: { label: '아이스 커피', emoji: '☕', lv: 1, draw: () => sprite4(CUP, 4, 20) },
+  seeds: { label: '해바라기씨', emoji: '🌻', lv: 3, draw: () => sprite4(SEEDS, 2, 22) },
+  clam: { label: '조개', emoji: '🐚', lv: 5, draw: () => sprite4(CLAM, 3, 22) },
+  goguma: {
+    label: '군고구마', emoji: '🍠', lv: 8,
+    draw: (now) => {
+      sprite4(GOGUMA, 4, 25);
+      sprite4(Math.floor(now / 400) % 2 ? STEAM_A : STEAM_B, 6, 19); // 김 모락모락
+    },
+  },
+  fan: {
+    label: '탁상 선풍기', emoji: '🌀', lv: 12,
+    draw: (now) => sprite4(Math.floor(now / 120) % 2 ? FAN_A : FAN_B, 3, 18),
+  },
+};
+
+/* 안경 — 눈 위치(P.eyes)에 맞춰 그려서 어느 펫이든 쓸 수 있다.
+ * 테라코타 뿔테 — 회색이면 고양이 털색에 묻힌다 */
+function drawGlasses(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  for (const ex of [PET_X + P.eyes.lx, PET_X + P.eyes.rx]) {
+    rect(ex - 1, y - 1, 4, 1, 'a'); // 2x2 눈을 감싸는 4x4 링
+    rect(ex - 1, y + 2, 4, 1, 'a');
+    rect(ex - 1, y, 1, 2, 'a');
+    rect(ex + 2, y, 1, 2, 'a');
+  }
+  // 브릿지 + 바깥으로 나가는 안경 다리
+  rect(PET_X + P.eyes.lx + 3, y, P.eyes.rx - P.eyes.lx - 4, 1, 'a');
+  px(PET_X + P.eyes.lx - 2, y, 'a');
+  px(PET_X + P.eyes.rx + 3, y, 'a');
+}
+
+/* 헤드셋 — 머리 폭(P.acc)이 펫마다 달라서 앵커를 펫 정의에 둔다.
+ * 정수리를 가로지르는 두툼한 검정 아치(안감 회색) + 큼직한 이어컵 */
+function drawHeadset(P, dy) {
+  const a = P.acc;
+  const ey = PET_Y + dy + P.eyes.y;
+  const yt = PET_Y + dy + a.top;   // 아치 윗줄
+  const lx = PET_X + a.l;
+  const rx = PET_X + a.r;
+  const w = a.r - a.l;
+  // 아치 밴드 — 검정 테에 테라코타 안감 (회색이면 경계선처럼 보인다)
+  rect(lx + 2, yt, w - 3, 1, 'k');
+  rect(lx + 2, yt + 1, w - 3, 1, 'a');
+  // 어깨처럼 내려가는 스텝
+  px(lx + 1, yt + 1, 'k'); px(rx - 1, yt + 1, 'k');
+  px(lx + 1, yt + 2, 'k'); px(rx - 1, yt + 2, 'k');
+  // 밴드 → 컵 연결 기둥 (머리가 길어 아치와 컵이 떨어진 펫만)
+  const cupTop = ey - 1;
+  if (cupTop > yt + 3) {
+    rect(lx, yt + 3, 1, cupTop - yt - 3, 'k');
+    rect(rx, yt + 3, 1, cupTop - yt - 3, 'k');
+  }
+  // 큼직한 이어컵 — 속에 테라코타 쿠션
+  rect(lx - 2, cupTop, 3, 4, 'k');
+  rect(rx, cupTop, 3, 4, 'k');
+  rect(lx - 1, cupTop + 1, 1, 2, 'a');
+  rect(rx + 1, cupTop + 1, 1, 2, 'a');
+}
+
+const ACC_ITEMS = {
+  none: { label: '없음', emoji: '✕', lv: 1, draw: null },
+  glasses: { label: '안경', emoji: '👓', lv: 6, draw: drawGlasses },
+  headset: { label: '헤드셋', emoji: '🎧', lv: 10, draw: drawHeadset },
+};
+
 // 화면 속 클로드 (절반 픽셀, 화면 위라 테두리 없이 플랫하게)
 const CLAWD = [
   '.aaaaaaaaaa.',
@@ -516,6 +686,8 @@ function renderPet(eye, dy) {
   sprite(eye, PET_X + P.eyes.lx, PET_Y + dy + P.eyes.y);
   sprite(eye, PET_X + P.eyes.rx, PET_Y + dy + P.eyes.y);
   P.face(dy);
+  const acc = ACC_ITEMS[petAcc];
+  if (acc && acc.draw) acc.draw(P, dy);
 }
 
 /* ---------------- 가구/소품 ---------------- */
@@ -537,10 +709,6 @@ function drawDesk() {
   rect(38, 20, 1, 3, 'k');
   rect(39, 20, 2, 3, 'T');
   rect(41, 20, 1, 3, 'k');
-}
-
-function drawCup() {
-  sprite4(CUP, 4, 20);
 }
 
 function drawMonitor(now, typing) {
@@ -602,6 +770,12 @@ if (window.pet) window.pet.onPetSize(setPetSize);
 
 let petKind = params.get('pet') || localStorage.getItem('petKind') || 'cat';
 if (!PET_DEFS[petKind]) petKind = 'cat';
+
+/* 꾸미기 선택 (책상 소품 / 액세서리) — 레벨로 잠금 해제 */
+let deskItem = params.get('desk') || localStorage.getItem('deskItem') || 'coffee';
+if (!DESK_ITEMS[deskItem]) deskItem = 'coffee';
+let petAcc = params.get('acc') || localStorage.getItem('petAcc') || 'none';
+if (!ACC_ITEMS[petAcc]) petAcc = 'none';
 
 const startTime = performance.now();
 
@@ -753,7 +927,7 @@ function thisWeekDays() {
  *  - 일 시작 후 타이핑하면 +1/초, 잠들면 -1/초, 잔소리 뜨면 -2/초
  *  - 자리 비움 중엔 증감 없음, 일 끝 완주 보너스 / 뽀모도로 보너스
  * ================================================================ */
-const XP_PER_LEVEL = (lv) => lv * 1000;
+const XP_PER_LEVEL = (lv) => lv * 2000; // 1000이었더니 레벨이 너무 빨리 올랐다
 const WORK_BONUS = 50;
 const WORK_BONUS_MIN_MS = 10 * 60000; // 10분 이상 일해야 완주 보너스 (시작/끝 반복 어뷰징 방지)
 const POMODORO_BONUS = 100;
@@ -796,6 +970,7 @@ function updateHud() {
 function addXp(n) {
   game.xp += n;
   let leveled = false;
+  const prevLevel = game.level;
   while (game.xp >= XP_PER_LEVEL(game.level)) {
     game.xp -= XP_PER_LEVEL(game.level);
     game.level += 1;
@@ -816,6 +991,10 @@ function addXp(n) {
   if (leveled) {
     state.celebrateUntil = performance.now() + CELEBRATE_MS;
     if (window.pet) window.pet.notify('🎉 레벨 업!', `펫이 Lv.${game.level}이 되었어요!`);
+    // 이번 레벨 업으로 새로 열린 꾸미기 아이템 알림
+    const news = [...Object.values(DESK_ITEMS), ...Object.values(ACC_ITEMS)]
+      .filter((it) => it.lv > prevLevel && it.lv <= game.level);
+    if (news.length) showToast(`🔓 해제: ${news.map((it) => `${it.emoji} ${it.label}`).join(', ')}`);
     pushScore();
   }
   if (dropped) {
@@ -1106,7 +1285,7 @@ function render(now) {
   drawDesk();
   const below = PET_DEFS[petKind].below;
   if (below) below(now);
-  drawCup();
+  DESK_ITEMS[deskItem].draw(now);
   drawMonitor(now, typing);
   drawKeyboard();
   drawMouse(wiggle);
@@ -1362,8 +1541,10 @@ function setNickTaken(taken) {
 const grassPanel = document.getElementById('grass-panel');
 
 /* 패널은 한 번에 하나만 */
+const decoPanel = document.getElementById('deco-panel');
+
 function openPanel(target) {
-  for (const p of [panel, rankPanel, grassPanel]) {
+  for (const p of [panel, rankPanel, grassPanel, decoPanel]) {
     if (p !== target) p.classList.add('hidden');
   }
   return !target.classList.toggle('hidden');
@@ -1515,13 +1696,55 @@ btnAway.addEventListener('click', () => {
   updateHud();
 });
 
+/* ---- 꾸미기 패널 (펫 / 책상 소품 / 액세서리) ---- */
 let petPushTimer = null;
+
+function decoButton(emoji, label, selected, lockLv, pick) {
+  const btn = document.createElement('button');
+  const locked = lockLv > game.level;
+  btn.textContent = locked ? `🔒${lockLv}` : emoji;
+  btn.title = locked ? `${label} — Lv.${lockLv}에 열려요` : label;
+  btn.classList.toggle('sel', selected);
+  btn.classList.toggle('lock', locked);
+  btn.addEventListener('click', () => {
+    if (locked) {
+      showToast(`🔒 ${label}은(는) Lv.${lockLv}이 되면 열려요`);
+      return;
+    }
+    pick();
+    renderDeco();
+  });
+  return btn;
+}
+
+function renderDeco() {
+  const pets = document.getElementById('deco-pets');
+  pets.replaceChildren(...PET_ORDER.map((k) =>
+    decoButton(PET_EMOJI[k], k, petKind === k, 1, () => {
+      petKind = k;
+      try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
+      // 연타하며 고를 수 있으니 멈춘 뒤 한 번만 업로드
+      clearTimeout(petPushTimer);
+      petPushTimer = setTimeout(pushScore, 2000);
+    })));
+
+  const desk = document.getElementById('deco-desk');
+  desk.replaceChildren(...Object.entries(DESK_ITEMS).map(([k, it]) =>
+    decoButton(it.emoji, it.label, deskItem === k, it.lv, () => {
+      deskItem = k;
+      try { localStorage.setItem('deskItem', k); } catch (_) { /* 무시 */ }
+    })));
+
+  const acc = document.getElementById('deco-acc');
+  acc.replaceChildren(...Object.entries(ACC_ITEMS).map(([k, it]) =>
+    decoButton(it.emoji, it.label, petAcc === k, it.lv, () => {
+      petAcc = k;
+      try { localStorage.setItem('petAcc', k); } catch (_) { /* 무시 */ }
+    })));
+}
+
 document.getElementById('btn-pet').addEventListener('click', () => {
-  petKind = PET_ORDER[(PET_ORDER.indexOf(petKind) + 1) % PET_ORDER.length];
-  try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
-  // 연타하며 고를 수 있으니 멈춘 뒤 한 번만 업로드
-  clearTimeout(petPushTimer);
-  petPushTimer = setTimeout(pushScore, 2000);
+  if (openPanel(decoPanel)) renderDeco();
 });
 
 document.getElementById('btn-quit').addEventListener('click', async () => {
@@ -1591,6 +1814,9 @@ if (DEMO_PANEL === 'rank') {
   renderGrass();
 } else if (DEMO_PANEL === 'brag') {
   showBrag();
+} else if (DEMO_PANEL === 'deco') {
+  decoPanel.classList.remove('hidden');
+  renderDeco();
 }
 
 /* ---- 창을 내용 높이에 맞추기 ----

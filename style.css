@@ -246,7 +246,8 @@ button:active {
 /* ---- 설정/랭킹 패널 ---- */
 #panel,
 #rank-panel,
-#grass-panel {
+#grass-panel,
+#deco-panel {
   -webkit-app-region: no-drag;
   display: flex;
   flex-direction: column;
@@ -305,6 +306,31 @@ button:active {
   display: flex;
   gap: 8px;
   justify-content: center;
+}
+
+/* ---- 꾸미기 패널 ---- */
+#deco-panel { width: 246px; } /* 펫 5종 버튼이 한 줄에 들어가는 폭 */
+.deco-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #1c1c1c;
+}
+.deco-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.deco-row button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 32px;
+  font-size: 15px;
+  padding: 0;
+}
+.deco-row button.sel { background: #ffe98a; }
+.deco-row button.lock {
+  opacity: 0.45;
+  font-size: 11px;
 }
 .panel-row button { flex: 1; font-size: 12px; }
 .preset { background: #ffe98a; }
