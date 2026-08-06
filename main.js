@@ -308,6 +308,12 @@ function logUpdateError(err) {
   } catch (_) { /* 무시 */ }
 }
 
+/* 다운로드 진행률을 펫 말풍선에 보여 준다 —
+ * 대화상자가 닫힌 뒤 완료 창까지 아무 표시가 없으면 멈춘 줄 안다 */
+function sendUpdateProgress(p) {
+  if (win && !win.isDestroyed()) win.webContents.send('update-progress', p);
+}
+
 function setupAutoUpdate() {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.autoDownload = false;
@@ -325,19 +331,27 @@ function setupAutoUpdate() {
       cancelId: 1,
     });
     if (response !== 0) return;
-    new Notification({ title: '업데이트 다운로드 중…', body: '다 되면 다시 알려드릴게요.' }).show();
     if (process.platform === 'darwin') {
       macSwapUpdate(info).catch((err) => {
         logUpdateError(err);
+        sendUpdateProgress({ done: true });
         manualUpdateFallback(info.version);
       });
     } else {
-      autoUpdater.downloadUpdate().catch(logUpdateError);
+      autoUpdater.downloadUpdate().catch((err) => {
+        logUpdateError(err);
+        sendUpdateProgress({ done: true });
+      });
     }
+  });
+
+  autoUpdater.on('download-progress', (p) => {
+    sendUpdateProgress({ percent: Math.round(p.percent) });
   });
 
   // Windows: 다 받아지면 재시작 여부만 묻는다 (나중에를 골라도 종료할 때 설치됨)
   autoUpdater.on('update-downloaded', async () => {
+    sendUpdateProgress({ done: true });
     const { response } = await dialog.showMessageBox({
       type: 'info',
       message: '업데이트 준비 완료',
@@ -390,12 +404,26 @@ async function macSwapUpdate(info) {
     const res = await fetch(zipUrl);
     if (!res.ok) throw new Error(`download failed: ${res.status}`);
     const hash = crypto.createHash('sha512');
+    const total = file.size || 0;
+    let got = 0;
+    let lastSent = 0;
     await pipeline(
       Readable.fromWeb(res.body),
-      async function* (src) { for await (const chunk of src) { hash.update(chunk); yield chunk; } },
+      async function* (src) {
+        for await (const chunk of src) {
+          hash.update(chunk);
+          got += chunk.length;
+          if (total && Date.now() - lastSent > 300) {
+            lastSent = Date.now();
+            sendUpdateProgress({ percent: Math.min(99, Math.round((got / total) * 100)) });
+          }
+          yield chunk;
+        }
+      },
       fs.createWriteStream(tmpZip)
     );
     if (hash.digest('base64') !== file.sha512) throw new Error('sha512 mismatch');
+    sendUpdateProgress({ percent: 100 });
 
     // 4) ditto로 해제하고 새 번들 모양 최소 검증
     execFileSync('/usr/bin/ditto', ['-x', '-k', tmpZip, stage]);
@@ -425,6 +453,7 @@ async function macSwapUpdate(info) {
   }
 
   // 6) 재시작 — 실행 중인 프로세스는 옛 버전이므로 바로 새로 뜨는 게 안전
+  sendUpdateProgress({ done: true });
   const { response } = await dialog.showMessageBox({
     type: 'info',
     message: `v${info.version} 설치 완료!`,

@@ -1350,6 +1350,19 @@ if (window.pet) {
     }
   });
 
+  // 업데이트 다운로드 진행률 — 완료 창이 뜰 때까지 토스트로 보여 준다
+  if (window.pet.onUpdateProgress) {
+    window.pet.onUpdateProgress((p) => {
+      if (p.done) {
+        toastEl.classList.add('hidden');
+        return;
+      }
+      clearTimeout(toastTimer); // 4초 자동 숨김을 막고 계속 띄워 둔다
+      toastEl.textContent = `⬇️ 업데이트 다운로드 중 … ${p.percent}%`;
+      toastEl.classList.remove('hidden');
+    });
+  }
+
   window.pet.status().then(({ accessibilityOK, platform }) => {
     if (accessibilityOK) return;
     const hint = document.getElementById('hint');
