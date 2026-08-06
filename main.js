@@ -173,6 +173,13 @@ function trayImage() {
 function refreshTrayMenu() {
   if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
+    { label: `Desktop Pet v${app.getVersion()}`, enabled: false },
+    ...(pendingUpdate ? [{
+      label: updateBusy ? '업데이트 다운로드 중…' : `v${pendingUpdate.version} 업데이트 받기`,
+      enabled: !updateBusy,
+      click: startUpdate,
+    }] : []),
+    { type: 'separator' },
     {
       label: '펫 크기',
       submenu: PET_SIZES.map((s) => ({
@@ -199,7 +206,7 @@ function refreshTrayMenu() {
 
 /* 규칙 숫자는 pet.js의 상수와 맞춰 둔다 (NAG_AFTER, WORK_BONUS, XP_PER_LEVEL …) */
 function showManual() {
-  dialog.showMessageBox({
+  dialog.showMessageBox(win, {
     type: 'none',
     title: '게임 규칙',
     message: '펫 키우기 규칙',
@@ -301,6 +308,8 @@ const { Readable } = require('stream');
 const RELEASES_URL = 'https://github.com/wooyerine/desktop-pet/releases/latest';
 const UPDATE_CHECK_MS = 6 * 3600 * 1000;
 let promptedVersion = ''; // 세션 안에서 같은 버전으로 다시 묻지 않는다
+let pendingUpdate = null; // 받을 수 있는 새 버전 정보 — 트레이 메뉴에 노출
+let updateBusy = false;   // 다운로드/교체 진행 중
 
 function logUpdateError(err) {
   try {
@@ -314,35 +323,56 @@ function sendUpdateProgress(p) {
   if (win && !win.isDestroyed()) win.webContents.send('update-progress', p);
 }
 
+/* 대화상자에서 "업데이트"를 누르거나 트레이 메뉴에서 골랐을 때 */
+function startUpdate() {
+  if (!pendingUpdate || updateBusy) return;
+  updateBusy = true;
+  refreshTrayMenu();
+  const info = pendingUpdate;
+  if (process.platform === 'darwin') {
+    macSwapUpdate(info).then(() => {
+      pendingUpdate = null; // 교체 완료 — 재시작만 남았다
+      updateBusy = false;
+      refreshTrayMenu();
+    }).catch((err) => {
+      logUpdateError(err);
+      sendUpdateProgress({ done: true });
+      updateBusy = false;
+      refreshTrayMenu();
+      manualUpdateFallback(info.version);
+    });
+  } else {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.downloadUpdate().catch((err) => {
+      logUpdateError(err);
+      sendUpdateProgress({ done: true });
+      updateBusy = false;
+      refreshTrayMenu();
+    });
+  }
+}
+
 function setupAutoUpdate() {
   const { autoUpdater } = require('electron-updater');
   autoUpdater.autoDownload = false;
   autoUpdater.on('error', logUpdateError);
 
   autoUpdater.on('update-available', async (info) => {
+    pendingUpdate = info;
+    refreshTrayMenu(); // 메뉴에 "업데이트 받기"가 생긴다
     if (info.version === promptedVersion) return;
     promptedVersion = info.version;
-    const { response } = await dialog.showMessageBox({
+    // 펫 창에 붙는 시트로 — 독립 창은 다른 앱에서 타이핑하다 Enter로
+    // 자기도 모르게 눌러 버릴 수 있다
+    const { response } = await dialog.showMessageBox(win, {
       type: 'info',
       message: `새 버전 v${info.version}이 나왔어요!`,
-      detail: `지금 버전은 v${app.getVersion()}. 업데이트할까요?`,
+      detail: `지금 버전은 v${app.getVersion()}. 업데이트할까요?\n나중에 하려면 메뉴바 아이콘에서 "업데이트 받기"를 누르면 돼요.`,
       buttons: ['업데이트', '나중에'],
       defaultId: 0,
       cancelId: 1,
     });
-    if (response !== 0) return;
-    if (process.platform === 'darwin') {
-      macSwapUpdate(info).catch((err) => {
-        logUpdateError(err);
-        sendUpdateProgress({ done: true });
-        manualUpdateFallback(info.version);
-      });
-    } else {
-      autoUpdater.downloadUpdate().catch((err) => {
-        logUpdateError(err);
-        sendUpdateProgress({ done: true });
-      });
-    }
+    if (response === 0) startUpdate();
   });
 
   autoUpdater.on('download-progress', (p) => {
@@ -352,7 +382,10 @@ function setupAutoUpdate() {
   // Windows: 다 받아지면 재시작 여부만 묻는다 (나중에를 골라도 종료할 때 설치됨)
   autoUpdater.on('update-downloaded', async () => {
     sendUpdateProgress({ done: true });
-    const { response } = await dialog.showMessageBox({
+    pendingUpdate = null;
+    updateBusy = false;
+    refreshTrayMenu();
+    const { response } = await dialog.showMessageBox(win, {
       type: 'info',
       message: '업데이트 준비 완료',
       detail: '지금 재시작해서 설치할까요? 나중에 해도 앱을 끌 때 설치돼요.',
@@ -370,7 +403,7 @@ function setupAutoUpdate() {
 
 /* 자동 교체가 불가능한 상황(권한/설치 위치)이면 수동 다운로드로 안내 */
 async function manualUpdateFallback(version) {
-  const { response } = await dialog.showMessageBox({
+  const { response } = await dialog.showMessageBox(win, {
     type: 'info',
     message: '자동 업데이트를 할 수 없어요',
     detail: `다운로드 페이지에서 v${version}을 받아 Applications에 넣어 주세요.`,
@@ -454,7 +487,7 @@ async function macSwapUpdate(info) {
 
   // 6) 재시작 — 실행 중인 프로세스는 옛 버전이므로 바로 새로 뜨는 게 안전
   sendUpdateProgress({ done: true });
-  const { response } = await dialog.showMessageBox({
+  const { response } = await dialog.showMessageBox(win, {
     type: 'info',
     message: `v${info.version} 설치 완료!`,
     detail: '지금 재시작할까요? 나중에 하면 다음 실행부터 새 버전이에요.\n' +
