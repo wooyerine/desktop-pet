@@ -451,9 +451,12 @@ app.whenReady().then(() => {
   }
 });
 
-// 종료 전에 훅을 멈추지 않으면 정리 단계에서 크래시가 난다
+/* 종료 — uiohook.stop()은 부르면 안 된다: macOS 26에서 훅 스레드
+ * join을 기다리며 메인 스레드가 영영 멈춘다 (종료가 안 끝나 좀비
+ * 프로세스가 남고, 업데이트 재시작도 옛 프로세스를 기다리다 멎는다).
+ * 정리 단계 크래시를 피하면서 확실히 끝나도록 바로 프로세스를 내린다 */
 app.on('will-quit', () => {
-  try { if (hook) hook.stop(); } catch (_) { /* 무시 */ }
+  process.exit(0);
 });
 
 ipcMain.handle('status', () => ({ accessibilityOK, platform: process.platform }));
