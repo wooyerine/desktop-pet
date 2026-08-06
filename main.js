@@ -108,6 +108,7 @@ function createWindow() {
   if (process.env.DEMO) q.push(`demo=${process.env.DEMO}`);
   if (process.env.TIMER) q.push(`timer=${process.env.TIMER}`);
   if (process.env.PANEL) q.push(`panel=${process.env.PANEL}`);
+  if (process.env.PET) q.push(`pet=${process.env.PET}`);
   win.loadFile('index.html', { search: `?${q.join('&')}` });
 
   if (process.env.SHOT) {

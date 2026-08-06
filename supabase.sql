@@ -1,5 +1,6 @@
--- 리더보드 스키마 v4 — 닉네임 계정 + 동기화 코드 + 잔디밭
--- (Supabase 대시보드 > SQL Editor에서 1회 실행. v1/v2/v3에서 업그레이드해도,
+-- 리더보드 스키마 v5 — 닉네임 계정 + 동기화 코드 + 잔디밭
+-- (v5에서 바뀐 것: 허용 펫에 hamster/otter 추가)
+-- (Supabase 대시보드 > SQL Editor에서 1회 실행. 옛 버전에서 업그레이드해도,
 --  새 프로젝트에 처음 실행해도 동작한다)
 --
 -- 닉네임이 곧 계정: lower(nickname) 고유, 비밀(동기화 코드)은 해시로 저장.
@@ -169,7 +170,9 @@ begin
     return jsonb_build_object('error', 'bad_secret');
   end if;
   if p_level is null or p_level < 1 or p_xp is null or p_xp < 0
-     or p_pet not in ('cat', 'dog', 'rabbit') then
+     -- 펫을 추가하면 여기도 늘려야 한다. 빠뜨리면 그 펫을 고른 사람은
+     -- 점수 업로드가 bad_input으로 조용히 막힌다 (pet.js의 PET_DEFS와 짝)
+     or p_pet not in ('cat', 'dog', 'rabbit', 'hamster', 'otter') then
     return jsonb_build_object('error', 'bad_input');
   end if;
 
