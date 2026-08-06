@@ -50,9 +50,12 @@
   > xattr -cr "/Applications/Desktop Pet.app"
   > ```
 
-- **Windows** (x64): `Desktop Pet-Setup-*.exe`를 받아 실행하면 바로 설치돼요.
+- **Windows** (x64): `desktop-pet-setup-*.exe`를 받아 실행하면 바로 설치돼요.
   서명이 없어서 SmartScreen 경고가 뜨면 **추가 정보 → 실행**을 누르세요.
   키보드 감지에 별도 권한은 필요 없어요.
+
+설치 후에는 새 버전이 나오면 앱이 알려줘요 — Windows는 받아서 재시작하면
+자동 설치되고, macOS는 zip을 받아 앱을 직접 교체한 뒤 재시작합니다.
 
 ## 개발용 실행
 
@@ -63,6 +66,24 @@ npm start
 
 배포 파일 빌드는 `npm run dist`(macOS) / `npm run dist:win`(Windows, macOS에서도 빌드 가능).
 결과물은 `dist/`에 생성됩니다.
+
+## 릴리즈 절차
+
+자동 업데이트가 GitHub 릴리즈를 피드로 쓰기 때문에 아래를 지켜야 해요:
+
+1. `package.json` 버전 올리고 커밋, 태그는 반드시 `v버전` 형식 (예: `v1.8.0`)
+2. `npm run dist && npm run dist:win`
+3. 릴리즈에 산출물과 함께 **`latest-mac.yml`·`latest.yml`을 꼭 업로드**
+   (이 두 파일이 업데이트 피드다 — 빠뜨리면 기존 유저가 새 버전을 모른다):
+
+   ```bash
+   gh release create v1.8.0 dist/desktop-pet-*.zip dist/desktop-pet-*.dmg \
+     dist/desktop-pet-setup-*.exe dist/latest-mac.yml dist/latest.yml
+   ```
+
+   파일명에 공백이 생기면 안 돼요 — GitHub이 공백을 점으로 바꿔서
+   yml 피드의 파일명과 어긋나 업데이트가 404로 실패합니다
+   (그래서 artifactName을 공백 없이 고정해 뒀어요).
 
 ## macOS 권한
 

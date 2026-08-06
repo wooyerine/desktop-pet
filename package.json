@@ -17,12 +17,19 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "uiohook-napi": "^1.5.5"
   },
   "build": {
     "appId": "com.wooyerine.desktop-pet",
     "npmRebuild": false,
     "productName": "Desktop Pet",
+    "publish": {
+      "provider": "github",
+      "owner": "wooyerine",
+      "repo": "desktop-pet"
+    },
+    "artifactName": "desktop-pet-${version}-${arch}.${ext}",
     "afterPack": "./scripts/adhoc-sign.js",
     "files": [
       "main.js",
@@ -63,7 +70,7 @@
     },
     "nsis": {
       "oneClick": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "desktop-pet-setup-${version}.${ext}"
     }
   }
 }

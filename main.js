@@ -285,6 +285,161 @@ function startInputHooks() {
   }
 }
 
+/* ================================================================
+ * 자동 업데이트 — GitHub 릴리즈 피드(latest*.yml)로 새 버전을 확인
+ *  - Windows(NSIS): electron-updater가 받아서 재시작할 때 설치
+ *  - macOS: ad-hoc 서명이라 Squirrel 설치가 안 된다 → 같은 피드에서
+ *    zip을 받아 sha512 검증 후 .app을 직접 바꿔치기하고 재시작.
+ *    zip 해제는 반드시 ditto로 — 노드 zip 라이브러리는 심볼릭 링크와
+ *    실행 권한을 깨뜨려 "손상된 앱"을 만든다
+ * ================================================================ */
+const { execFileSync } = require('child_process');
+const crypto = require('crypto');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
+
+const RELEASES_URL = 'https://github.com/wooyerine/desktop-pet/releases/latest';
+const UPDATE_CHECK_MS = 6 * 3600 * 1000;
+let promptedVersion = ''; // 세션 안에서 같은 버전으로 다시 묻지 않는다
+
+function logUpdateError(err) {
+  try {
+    fs.writeFileSync(path.join(app.getPath('userData'), 'update-error.log'), String((err && err.stack) || err));
+  } catch (_) { /* 무시 */ }
+}
+
+function setupAutoUpdate() {
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.autoDownload = false;
+  autoUpdater.on('error', logUpdateError);
+
+  autoUpdater.on('update-available', async (info) => {
+    if (info.version === promptedVersion) return;
+    promptedVersion = info.version;
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      message: `새 버전 v${info.version}이 나왔어요!`,
+      detail: `지금 버전은 v${app.getVersion()}. 업데이트할까요?`,
+      buttons: ['업데이트', '나중에'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response !== 0) return;
+    new Notification({ title: '업데이트 다운로드 중…', body: '다 되면 다시 알려드릴게요.' }).show();
+    if (process.platform === 'darwin') {
+      macSwapUpdate(info).catch((err) => {
+        logUpdateError(err);
+        manualUpdateFallback(info.version);
+      });
+    } else {
+      autoUpdater.downloadUpdate().catch(logUpdateError);
+    }
+  });
+
+  // Windows: 다 받아지면 재시작 여부만 묻는다 (나중에를 골라도 종료할 때 설치됨)
+  autoUpdater.on('update-downloaded', async () => {
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      message: '업데이트 준비 완료',
+      detail: '지금 재시작해서 설치할까요? 나중에 해도 앱을 끌 때 설치돼요.',
+      buttons: ['지금 재시작', '나중에'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+
+  const check = () => autoUpdater.checkForUpdates().catch(logUpdateError);
+  setTimeout(check, 15000); // 시작 직후는 창 띄우는 게 먼저
+  setInterval(check, UPDATE_CHECK_MS);
+}
+
+/* 자동 교체가 불가능한 상황(권한/설치 위치)이면 수동 다운로드로 안내 */
+async function manualUpdateFallback(version) {
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    message: '자동 업데이트를 할 수 없어요',
+    detail: `다운로드 페이지에서 v${version}을 받아 Applications에 넣어 주세요.`,
+    buttons: ['다운로드 페이지 열기', '닫기'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) shell.openExternal(RELEASES_URL);
+}
+
+/* macOS: zip을 받아 검증하고 실행 중인 .app을 원자적으로 바꿔치기 */
+async function macSwapUpdate(info) {
+  // 1) 실행 중인 번들 경로 — Contents/MacOS/실행파일에서 세 단계 위
+  const bundle = path.resolve(process.execPath, '..', '..', '..');
+  const parent = path.dirname(bundle);
+  if (!bundle.endsWith('.app')) throw new Error(`not an app bundle: ${bundle}`);
+  if (bundle.includes('AppTranslocation') || parent.startsWith('/Volumes/')) {
+    throw new Error(`bundle not swappable: ${bundle}`); // DMG에서 바로 실행 중이거나 격리 상태
+  }
+  fs.accessSync(parent, fs.constants.W_OK); // 쓰기 불가면 throw → 수동 안내
+
+  // 2) 피드에서 zip 자산 찾기 — files[].url은 파일명이라 다운로드 주소를 조립한다
+  const file = (info.files || []).find((f) => f.url && f.url.endsWith('.zip'));
+  if (!file) throw new Error('update feed has no zip');
+  const zipUrl = `https://github.com/wooyerine/desktop-pet/releases/download/v${info.version}/${file.url}`;
+
+  // 3) 내려받으며 sha512 해시 계산
+  const tmpZip = path.join(app.getPath('temp'), `desktop-pet-${info.version}.zip`);
+  const stage = fs.mkdtempSync(path.join(app.getPath('temp'), 'desktop-pet-update-'));
+  try {
+    const res = await fetch(zipUrl);
+    if (!res.ok) throw new Error(`download failed: ${res.status}`);
+    const hash = crypto.createHash('sha512');
+    await pipeline(
+      Readable.fromWeb(res.body),
+      async function* (src) { for await (const chunk of src) { hash.update(chunk); yield chunk; } },
+      fs.createWriteStream(tmpZip)
+    );
+    if (hash.digest('base64') !== file.sha512) throw new Error('sha512 mismatch');
+
+    // 4) ditto로 해제하고 새 번들 모양 최소 검증
+    execFileSync('/usr/bin/ditto', ['-x', '-k', tmpZip, stage]);
+    const appName = fs.readdirSync(stage).find((n) => n.endsWith('.app'));
+    if (!appName) throw new Error('no .app in zip');
+    const newApp = path.join(stage, appName);
+    fs.accessSync(path.join(newApp, 'Contents', 'MacOS'), fs.constants.R_OK);
+
+    // 5) 교체 — 기존을 옆으로 밀고 새것을 제자리에, 실패하면 되돌린다
+    const backup = path.join(parent, `.${path.basename(bundle)}.old-${Date.now()}`);
+    fs.renameSync(bundle, backup);
+    try {
+      try {
+        fs.renameSync(newApp, bundle);
+      } catch (err) {
+        if (err.code !== 'EXDEV') throw err;
+        execFileSync('/usr/bin/ditto', [newApp, bundle]); // 임시 폴더가 다른 볼륨이면 복사
+      }
+    } catch (err) {
+      fs.renameSync(backup, bundle); // 롤백
+      throw err;
+    }
+    fs.rm(backup, { recursive: true, force: true }, () => {});
+  } finally {
+    fs.rm(tmpZip, { force: true }, () => {});
+    fs.rm(stage, { recursive: true, force: true }, () => {});
+  }
+
+  // 6) 재시작 — 실행 중인 프로세스는 옛 버전이므로 바로 새로 뜨는 게 안전
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    message: `v${info.version} 설치 완료!`,
+    detail: '지금 재시작할까요? 나중에 하면 다음 실행부터 새 버전이에요.\n' +
+      '(업데이트 후 키보드 감지가 멈추면 손쉬운 사용 권한을 다시 등록해 주세요)',
+    buttons: ['지금 재시작', '나중에'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) {
+    app.relaunch();
+    app.quit(); // quit이어야 will-quit에서 입력 훅을 정리한다
+  }
+}
+
 app.whenReady().then(() => {
   if (app.dock) app.dock.hide();
   loadSettings();
@@ -292,6 +447,7 @@ app.whenReady().then(() => {
   if (!process.env.SHOT) {
     createTray();
     startInputHooks(); // 스크린샷 모드에선 전역 훅 불필요
+    if (app.isPackaged) setupAutoUpdate(); // 개발 실행에선 업데이트 확인 안 함
   }
 });
 
