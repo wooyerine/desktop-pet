@@ -247,7 +247,8 @@ button:active {
 #panel,
 #rank-panel,
 #grass-panel,
-#deco-panel {
+#deco-panel,
+#ach-panel {
   -webkit-app-region: no-drag;
   display: flex;
   flex-direction: column;
@@ -263,6 +264,25 @@ button:active {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
+  color: #1c1c1c;
+}
+#rank-list li { cursor: pointer; }
+#rank-list li:hover { background: #f4f0e4; }
+#rank-list li.me { background: #ffe98a; }
+
+/* ---- 친구 책상 구경 미리보기 ---- */
+#rank-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-top: 3px solid #1c1c1c;
+  padding-top: 8px;
+}
+#preview-canvas { image-rendering: pixelated; }
+#preview-name {
+  font-size: 10px;
+  font-weight: bold;
   color: #1c1c1c;
 }
 #nickname,
@@ -332,6 +352,75 @@ button:active {
   opacity: 0.45;
   font-size: 11px;
 }
+/* ---- 업적 패널 ---- */
+#ach-panel { width: 246px; }
+#ach-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+#ach-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ach-emoji {
+  font-size: 16px;
+  width: 22px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+.ach-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ach-body b { font-size: 11px; color: #1c1c1c; }
+.ach-body small { font-size: 9px; color: #8a5f3c; }
+.ach-bar {
+  height: 5px;
+  border: 2px solid #1c1c1c;
+  background: #ffffff;
+}
+.ach-bar i {
+  display: block;
+  height: 100%;
+  background: #f7c948;
+}
+#ach-list li.done .ach-bar i { background: #3f9d4e; }
+.ach-val {
+  font-size: 9px;
+  color: #1c1c1c;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+#visitor-dex {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+#visitor-dex .dex {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #1c1c1c;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: bold;
+  color: #1c1c1c;
+}
+#visitor-dex .dex.unseen { opacity: 0.4; }
+#dex-hint {
+  font-size: 9px;
+  color: #8a5f3c;
+  text-align: center;
+}
+
 .panel-row button { flex: 1; font-size: 12px; }
 .preset { background: #ffe98a; }
 #custom-min {

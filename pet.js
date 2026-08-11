@@ -16,7 +16,8 @@ let SCALE = 8;
 let HALF = 4;
 
 const canvas = document.getElementById('pet-canvas');
-const ctx = canvas.getContext('2d');
+// 랭킹의 "친구 책상 구경" 미리보기가 잠깐 자기 캔버스로 바꿔 그린다
+let ctx = canvas.getContext('2d');
 
 /* ---------------- 팔레트 ---------------- */
 const PAL = {
@@ -54,16 +55,24 @@ const PAL = {
   z: '#a9c1dd', // Zzz
   s: '#e8c8f0', // 파티 1
   S: '#a7e0b8', // 파티 2
+  F: '#3f9d4e', // 잎 진한 초록 (화분 / 토마토 꼭지)
+  A: '#7bc86c', // 잎 밝은 초록
+  V: '#8fd0e8', // 어항 물
+  X: '#f2913d', // 불꽃 / 물고기 주황
+  R: '#d9534f', // 토마토 빨강 / 목도리 / 왕관 보석
 };
 
 /* ---------------- 그리기 헬퍼 ---------------- */
+/* 스킨 색 치환표 — 펫을 그리는 동안만 세팅된다 (가구는 원래 색 유지) */
+let skinMap = null;
+
 function px(x, y, color) {
-  ctx.fillStyle = PAL[color] || color;
+  ctx.fillStyle = (skinMap && skinMap[color]) || PAL[color] || color;
   ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
 }
 
 function rect(x, y, w, h, color) {
-  ctx.fillStyle = PAL[color] || color;
+  ctx.fillStyle = (skinMap && skinMap[color]) || PAL[color] || color;
   ctx.fillRect(x * SCALE, y * SCALE, w * SCALE, h * SCALE);
 }
 
@@ -73,6 +82,27 @@ function sprite(grid, ox, oy) {
     for (let x = 0; x < row.length; x++) {
       const ch = row[x];
       if (ch !== '.' && PAL[ch]) px(ox + x, oy + y, ch);
+    }
+  }
+}
+
+/* 스프라이트 실루엣을 여덟 방향으로 반 칸씩 밀어 그린다 — 위에 본체를 겹치면
+ * 가장자리에 반 칸짜리 얇은 림 라이트(테두리 빛)만 남는다.
+ * 흑요석처럼 어두운 스킨이 어두운 배경에 묻히지 않게 하는 용도 */
+const RIM_OFFSETS = [
+  [0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5],
+  [0.5, 0.5], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5],
+];
+
+function spriteRim(grid, ox, oy, color) {
+  ctx.fillStyle = color;
+  for (let y = 0; y < grid.length; y++) {
+    const row = grid[y];
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '.') continue;
+      for (const [dx, dy] of RIM_OFFSETS) {
+        ctx.fillRect((ox + x + dx) * SCALE, (oy + y + dy) * SCALE, SCALE, SCALE);
+      }
     }
   }
 }
@@ -446,6 +476,8 @@ const PET_DEFS = {
       const mousing = state.mode === 'mousing' || now - state.lastMouse < 450;
       const spr = mousing && Math.floor(now / 240) % 2
         ? OTTER_LOWER_SWING : OTTER_LOWER;
+      const rim = SKINS[petSkin] && SKINS[petSkin].rim;
+      if (rim) spriteRim(spr, 11, 19, rim);
       sprite(spr, 11, 19);
     },
   },
@@ -583,7 +615,233 @@ const FAN_B = [
   '..kkkkkkkk.',
 ];
 
-/* ---------------- 꾸미기 아이템 목록 (레벨로 잠금 해제) ---------------- */
+/* ---------------- 고레벨 책상 소품 스프라이트 ---------------- */
+
+// 화분 — 식물이 펫 레벨에 따라 새싹 → 수풀 → 꽃으로 자란다
+const POT = [
+  'kkkkkkkkk',
+  'kaaaaaaak',
+  '.kaaaaak.',
+  '.kaaaaak.',
+  '.kTTTTTk.',
+  '..kkkkk..',
+];
+const PLANT_SPROUT = [
+  '.AA.AA.',
+  'AAF.FAA',
+  '.AF.FA.',
+  '..FFF..',
+  '...F...',
+];
+const PLANT_BUSH = [
+  '..AFA..',
+  '.AAFAA.',
+  'AFAAAFA',
+  'AAAFAAA',
+  '.AAAAA.',
+  '...F...',
+];
+const PLANT_FLOWER = [
+  '...p...',
+  '..pyp..',
+  '.A.p.A.',
+  'AAAFAAA',
+  'AFAAAFA',
+  '.AAAAA.',
+  '...F...',
+];
+
+/* 화분 식물 단계 — 미리보기에서는 그 사람의 레벨로 그린다 */
+let previewLevel = null;
+
+/* 새싹(18) → 수풀(30) → 꽃(42). 꽃이 펴야 나비가 찾아온다 */
+function drawPot() {
+  const lv = previewLevel ?? game.level;
+  const plant = lv >= 42 ? PLANT_FLOWER : lv >= 30 ? PLANT_BUSH : PLANT_SPROUT;
+  sprite4(plant, 5, 27 - plant.length);
+  sprite4(POT, 4, 27);
+}
+
+// 어항 — 물고기가 좌우로 헤엄치고 공기방울이 올라온다
+const BOWL = [
+  '..kkkkkkkk..',
+  '.kWVVVVVVWk.',
+  'kVVVVVVVVVVk',
+  'kVVVVVVVVVVk',
+  'kVVVVVVVVVVk',
+  'kVVVVVVVVVVk',
+  'kVVVVVVVVVVk',
+  '.kVVVVVVVVk.',
+  '..kkkkkkkk..',
+  '...kGGGGk...',
+  '...kkkkkk...',
+];
+const FISH_R = [
+  'X..XX',
+  'XXXXW',
+  'X..XX',
+];
+const FISH_L = [
+  'XX..X',
+  'WXXXX',
+  'XX..X',
+];
+
+function drawBowl(now) {
+  sprite4(BOWL, 3, 22);
+  const ph = now / 1100;
+  const fx = 3.5 + Math.sin(ph) * 2.5;
+  sprite4(Math.cos(ph) >= 0 ? FISH_R : FISH_L,
+    3 + Math.round(fx), 26 + (Math.floor(now / 700) % 2));
+  // 공기방울 — 물 안에서만 올라온다
+  const rise = Math.floor(now / 350) % 4;
+  px4(3 + 5 + Math.round(Math.sin(ph)), 27 - rise, 'W');
+}
+
+// 무드등(캔들) — 불꽃이 흔들리고, 밤에는 은은한 빛무리가 커진다
+const CANDLE_A = [
+  '...X...',
+  '..XyX..',
+  '...y...',
+  '...k...',
+  '.kkkkk.',
+  'kWWWWWk',
+  'kWWpWWk',
+  'kWWWWWk',
+  'kkkkkkk',
+];
+const CANDLE_B = [
+  '..X....',
+  '..XyX..',
+  '...y...',
+  '...k...',
+  '.kkkkk.',
+  'kWWWWWk',
+  'kWWpWWk',
+  'kWWWWWk',
+  'kkkkkkk',
+];
+
+function drawCandleGlow(now, night) {
+  // 불꽃 위치(절반 픽셀 8.5, 25.5)를 중심으로 한 원형 그라데이션 빛
+  const cx = 8.5 * HALF;
+  const cy = 25.5 * HALF;
+  const r = (night ? 15 : 10) * HALF;
+  const a = (night ? 0.30 : 0.12) + 0.05 * Math.sin(now / 420);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, `rgba(255,214,90,${a.toFixed(3)})`);
+  g.addColorStop(1, 'rgba(255,214,90,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+}
+
+// 토마토 — 뽀모도로 100회 완주 기념
+const TOMATO = [
+  '..F..F..',
+  '...FF...',
+  '.kkFFkk.',
+  'kRRFFRRk',
+  'kRWRRRRk',
+  'kRRRRRRk',
+  '.kRRRRk.',
+  '..kkkk..',
+];
+
+// 미니 모닥불 — 30일 연속 잔디 기념, 불꽃이 일렁인다
+const FIRE_A = [
+  '....y...',
+  '...yy...',
+  '..yXXy..',
+  '..XyyX..',
+  '.XXyyXX.',
+  'kBBkkBBk',
+  'kBBBBBBk',
+  '.kkkkkk.',
+];
+const FIRE_B = [
+  '...y....',
+  '...yy...',
+  '..yXy...',
+  '..XyyX..',
+  '.XXyXX..',
+  'kBBkkBBk',
+  'kBBBBBBk',
+  '.kkkkkk.',
+];
+
+// 아침 해 — 새벽 5시 세션 기념 장식
+const SUN = [
+  'y...y...y',
+  '..kkkkk..',
+  '.kyyyyyk.',
+  'ykyyXyyky',
+  '.kyyyyyk.',
+  '..kkkkk..',
+  'y...y...y',
+  '....k....',
+  '..kTTTk..',
+  '..kkkkk..',
+];
+
+// 크리스마스 트리 — 겨울 이벤트 보상. 별 + 3단 가지 + 오너먼트
+const TREE = [
+  '.....y.....',
+  '....yyy....',
+  '....kFk....',
+  '...kFAFk...',
+  '..kFRFAFk..',
+  '...kFAFk...',
+  '..kFAFAFk..',
+  '.kFAFsFAFk.',
+  '..kFAFAFk..',
+  '.kFAFAFRFk.',
+  'kFRFAFAFsFk',
+  '.kkkkkkkkk.',
+  '....kBk....',
+  '....kBk....',
+];
+
+// 할로윈 펌킨 조명 — 눈코입이 빛나는 잭오랜턴
+const PUMPKIN = [
+  '....kF....',
+  '....kFk...',
+  '..kkXXkk..',
+  '.kXXaXXXk.',
+  'kXyyXXyyXk',
+  'kXXXaXXXXk',
+  'kXyXyyXyXk',
+  '.kXXXXXXk.',
+  '..kkkkkk..',
+];
+
+function drawPumpkinGlow(now, night) {
+  // 눈코입 위치(절반 픽셀 9, 29)를 중심으로 한 주황 불빛
+  const cx = 9 * HALF;
+  const cy = 29 * HALF;
+  const r = (night ? 14 : 9) * HALF;
+  const a = (night ? 0.28 : 0.10) + 0.05 * Math.sin(now / 380);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, `rgba(255,170,60,${a.toFixed(3)})`);
+  g.addColorStop(1, 'rgba(255,170,60,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+}
+
+// 트로피 — 리더보드 1위 기념
+const TROPHY = [
+  '.kkkkkkkkk.',
+  '.kyyyyyyyk.',
+  'kykyyWyykyk',
+  'kkkyyyyykkk',
+  '...kyyyk...',
+  '....kyk....',
+  '...kkkkk...',
+  '...kDDDk...',
+  '..kkkkkkk..',
+];
+
+/* ---------------- 꾸미기 아이템 목록 ----------------
+ * lv 있는 것은 레벨로, ach 있는 것은 업적으로 잠금 해제 */
 const DESK_ITEMS = {
   coffee: { label: '아이스 커피', emoji: '☕', lv: 1, draw: () => sprite4(CUP, 4, 20) },
   seeds: { label: '해바라기씨', emoji: '🌻', lv: 3, draw: () => sprite4(SEEDS, 2, 22) },
@@ -599,6 +857,26 @@ const DESK_ITEMS = {
     label: '탁상 선풍기', emoji: '🌀', lv: 12,
     draw: (now) => sprite4(Math.floor(now / 120) % 2 ? FAN_A : FAN_B, 3, 18),
   },
+  pot: { label: '화분', emoji: '🪴', lv: 18, draw: drawPot },
+  bowl: { label: '어항', emoji: '🐠', lv: 27, draw: drawBowl },
+  candle: {
+    label: '무드등', emoji: '🕯️', lv: 36,
+    draw: (now) => sprite4(Math.floor(now / 500) % 2 ? CANDLE_A : CANDLE_B, 5, 24),
+    glow: drawCandleGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
+  },
+  tomato: { label: '토마토', emoji: '🍅', lv: 1, ach: 'pomo100', draw: () => sprite4(TOMATO, 4, 25) },
+  campfire: {
+    label: '미니 모닥불', emoji: '🔥', lv: 1, ach: 'streak30',
+    draw: (now) => sprite4(Math.floor(now / 180) % 2 ? FIRE_A : FIRE_B, 4, 25),
+  },
+  sun: { label: '아침 해', emoji: '☀️', lv: 1, ach: 'early5', draw: () => sprite4(SUN, 4, 23) },
+  trophy: { label: '트로피', emoji: '🏆', lv: 1, ach: 'top1', draw: () => sprite4(TROPHY, 3, 24) },
+  pumpkin: {
+    label: '펌킨 조명', emoji: '🎃', lv: 1, ach: 'eventGhost',
+    draw: () => sprite4(PUMPKIN, 4, 24),
+    glow: drawPumpkinGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
+  },
+  tree: { label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce', draw: () => sprite4(TREE, 3, 19) },
 };
 
 /* 안경 — 눈 위치(P.eyes)에 맞춰 그려서 어느 펫이든 쓸 수 있다.
@@ -645,10 +923,176 @@ function drawHeadset(P, dy) {
   rect(rx + 1, cupTop + 1, 1, 2, 'a');
 }
 
+/* 목도리 — 어깨선을 두 줄로 감고 오른쪽에 꼬리가 늘어진다.
+ * 얼굴이 커서 턱 바로 밑에 두르면 입처럼 보인다 — 어깨까지 내린다 */
+function drawScarf(P, dy) {
+  const y = PET_Y + dy + P.eyes.y + 5;
+  const l = PET_X + P.acc.l + 2;
+  const r = PET_X + P.acc.r - 2;
+  rect(l, y, r - l + 1, 1, 'R');
+  rect(l, y + 1, r - l + 1, 1, '#b23e3a');
+  rect(r - 3, y + 2, 2, 2, 'R');       // 늘어진 꼬리
+  rect(r - 3, y + 4, 2, 1, '#b23e3a'); // 술
+}
+
+/* 선글라스 — 안경과 같은 앵커, 렌즈를 까맣게 채운다 */
+function drawSunglasses(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  for (const ex of [PET_X + P.eyes.lx, PET_X + P.eyes.rx]) {
+    rect(ex - 1, y - 1, 4, 4, 'k');
+    px(ex, y, 'G'); // 렌즈 반사광
+  }
+  rect(PET_X + P.eyes.lx + 3, y, P.eyes.rx - P.eyes.lx - 4, 1, 'k');
+  px(PET_X + P.eyes.lx - 2, y, 'k');
+  px(PET_X + P.eyes.rx + 3, y, 'k');
+}
+
+/* 산타 모자 — 흰 털 브림 + 빨간 크라운, 끝이 오른쪽으로 처지고 방울이 달린다.
+ * 머리 위 여백이 1칸뿐이라 정수리에 눌러쓴 실루엣로 그린다 */
+function drawHat(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const l = PET_X + P.eyes.lx - 3;
+  const w = P.eyes.rx - P.eyes.lx + 7;
+  const r = l + w - 1;
+  const mid = l + (w >> 1);
+  const s = y - 6 < 0 ? 1 : 0;             // 머리가 캔버스 끝에 닿는 펫은 한 칸 눌러쓴다
+  rect(mid, y - 6 + s, r - 1 - mid, 1, 'R');   // 오른쪽으로 처진 끝
+  rect(l + 2, y - 5 + s, w - 4, 1, 'R');       // 좁아지는 크라운
+  rect(l + 1, y - 4 + s, w - 2, 1, 'R');
+  rect(r - 1, y - 6 + s, 2, 2, 'W');           // 하얀 털 방울
+  px(r + 1, y - 5 + s, 'W');
+  rect(l, y - 3 + s, w, 1, 'W');               // 흰 털 브림
+  rect(l, y - 2 + s, w, 1, 'k');               // 브림 밑 테두리
+  px(l - 1, y - 3 + s, 'k');                   // 브림 양끝 테두리 (흰 토끼 위에서도 또렷하게)
+  px(r + 1, y - 3 + s, 'k');
+}
+
+/* 왕관 — 금색 밴드 + 보석 + 뾰족 3개, 고레벨의 상징.
+ * 검정 테두리를 둘러야 골드 스킨 위에서도 묻히지 않는다 */
+function drawCrown(P, dy) {
+  const y = PET_Y + dy + P.eyes.y - 4;
+  const l = PET_X + P.eyes.lx - 1;
+  const r = PET_X + P.eyes.rx + 2;
+  const w = r - l + 1;
+  const mid = l + (w >> 1);
+  rect(l - 1, y - 1, 1, 3, 'k');      // 왼쪽 테두리
+  rect(r + 1, y - 1, 1, 3, 'k');      // 오른쪽 테두리
+  rect(l, y + 2, w, 1, 'k');          // 밴드 아래 테두리
+  rect(l, y, w, 2, 'y');
+  px(mid, y + 1, 'R');                // 가운데 보석
+  px(l, y - 1, 'y');
+  px(r, y - 1, 'y');
+  px(mid, y - 1, 'y');
+  px(mid, y - 2, 'y');
+  px(mid - 1, y - 2, 'k');            // 가운데 뾰족 테두리
+  px(mid + 1, y - 2, 'k');
+}
+
 const ACC_ITEMS = {
   none: { label: '없음', emoji: '✕', lv: 1, draw: null },
   glasses: { label: '안경', emoji: '👓', lv: 6, draw: drawGlasses },
   headset: { label: '헤드셋', emoji: '🎧', lv: 10, draw: drawHeadset },
+  scarf: { label: '목도리', emoji: '🧣', lv: 13, draw: drawScarf },
+  sunglasses: { label: '선글라스', emoji: '🕶️', lv: 16, draw: drawSunglasses },
+  hat: { label: '산타 모자', emoji: '🎅', lv: 18, draw: drawHat },
+  crown: { label: '왕관', emoji: '👑', lv: 20, draw: drawCrown },
+};
+
+/* ---------------- 스킨 (팔레트 교체) ----------------
+ * 실루엣은 그대로 두고 몸통 색만 갈아 끼운다. 홀로그램은 매 프레임
+ * 색상환을 돌며 반짝인다 */
+const PET_BODY_CHARS = {
+  cat: { base: 'o', shade: 'O', light: 'c' },
+  dog: { base: 'b', shade: 'e', light: 'f' },
+  rabbit: { base: 'w', shade: 'u' },
+  hamster: { base: 'n', shade: 'N', light: 'w' },
+  otter: { base: 'j', shade: 'J', light: 'i' },
+};
+
+const SKINS = {
+  none: { label: '기본', emoji: '🐾', lv: 1 },
+  gold: {
+    label: '골드', emoji: '✨', lv: 25,
+    // 대비를 크게 — 밝은 곳은 거의 흰 금, 그늘은 진한 황동이어야 금속처럼 보인다
+    colors: { base: '#f2c14e', shade: '#c07f1c', light: '#ffedb3' },
+    // 토끼는 몸 전체가 단색이라 진한 금을 통째로 칠하면 황달처럼 보인다 —
+    // 크림빛 샴페인 골드로 살짝만 물들인다
+    perPet: { rabbit: { base: '#f7dc8f', shade: '#cf9c2e' } },
+    sparkle: '#fff7d6',
+  },
+  strawberry: {
+    label: '딸기우유', emoji: '🍓', lv: 30,
+    colors: { base: '#f5b8c9', shade: '#d9849e', light: '#fde3ea' },
+  },
+  obsidian: {
+    label: '흑요석', emoji: '🌑', lv: 50, // 최상위 과시템 — 오래 키운 사람의 상징
+    // 보라 기운이 도는 유리질 검정 — 회색이면 그냥 때 탄 고양이다
+    colors: { base: '#322e3c', shade: '#201d28', light: '#5a5470' },
+    // 눈은 연보라 — 노란 눈은 어둠 속 맹수처럼 보여서 무섭다.
+    // 보라 글린트와 같은 계열이라 밤하늘처럼 몽글해진다
+    eye: '#cbb7f0',
+    sparkle: '#b9a7e8', // 보라 광택 글린트
+    rim: '#a89ec4',     // 림 라이트 — 어두운 바탕화면에서도 실루엣이 살아 있게
+  },
+  // ---- 계절 이벤트 스킨 — 레벨이 아니라 이벤트 업적으로 해제 ----
+  ghost: {
+    label: '유령', emoji: '👻', lv: 1, ach: 'eventGhost',
+    // 반투명 — 뒤의 바탕화면이 비쳐 보인다
+    colors: {
+      base: 'rgba(235,238,250,0.55)',
+      shade: 'rgba(185,192,220,0.55)',
+      light: 'rgba(250,252,255,0.6)',
+    },
+  },
+  ice: {
+    label: '아이스', emoji: '❄️', lv: 1, ach: 'eventIce',
+    colors: { base: '#cfe8f2', shade: '#8fc3d9', light: '#f0fafd' },
+    sparkle: '#ffffff',
+  },
+};
+
+function petSkinMap() {
+  const sk = SKINS[petSkin];
+  if (!sk || !sk.colors) return null;
+  const ch = PET_BODY_CHARS[petKind];
+  const c = (sk.perPet && sk.perPet[petKind]) || sk.colors;
+  const m = { [ch.base]: c.base, [ch.shade]: c.shade };
+  if (ch.light) m[ch.light] = c.light;
+  if (sk.eye) m.__eye = sk.eye; // renderPet이 눈 스프라이트에만 적용
+  return m;
+}
+
+/* 스킨 반짝이 — 몸통 위 세 점이 번갈아 반짝인다. 금속/보석 느낌의 핵심 */
+function drawSkinSparkle(now, dy) {
+  const sk = SKINS[petSkin];
+  if (!sk || !sk.sparkle) return;
+  const a = PET_DEFS[petKind].acc;
+  const spots = [
+    [a.l + 3, 9],
+    [a.r - 3, 12],
+    [a.l + ((a.r - a.l) >> 1), 4],
+  ];
+  spots.forEach(([sx, sy], i) => {
+    if (Math.floor(now / 400 + i * 1.4) % 4 === 0) {
+      px(PET_X + sx, PET_Y + dy + sy, sk.sparkle);
+    }
+  });
+}
+
+/* ---------------- 책상 스타일 (상판/다리 색 교체) ---------------- */
+const DESK_STYLES = {
+  basic: { label: '기본 책상', emoji: '🟧', lv: 1, top: 't', stripe: 'y', leg: 'T' },
+  wood: { label: '원목 책상', emoji: '🪵', lv: 15, top: '#8f6136', stripe: '#c99961', leg: '#6e4826' },
+  marble: {
+    label: '대리석 책상', emoji: '🏛️', lv: 25,
+    top: '#e8e6ef', stripe: '#cbc8da', leg: '#b9b6c8', vein: '#aaa7bd',
+  },
+};
+
+/* ---------------- 키보드 스타일 ---------------- */
+const KB_ITEMS = {
+  basic: { label: '기본 키보드', emoji: '⌨️', lv: 1 },
+  mech: { label: '기계식 키보드', emoji: '🎹', lv: 22 },
 };
 
 // 화면 속 클로드 (절반 픽셀, 화면 위라 테두리 없이 플랫하게)
@@ -682,9 +1126,15 @@ const PAW_DOWN = 14;
 
 function renderPet(eye, dy) {
   const P = PET_DEFS[petKind];
+  const rim = SKINS[petSkin] && SKINS[petSkin].rim;
+  if (rim) spriteRim(P.sprite, PET_X - 1, PET_Y - 1 + dy, rim);
   sprite(P.sprite, PET_X - 1, PET_Y - 1 + dy);
+  // 흑요석 같은 어두운 스킨은 눈 색을 따로 지정한다 — 눈에만 잠깐 적용
+  const m = skinMap;
+  if (m && m.__eye) skinMap = { ...m, k: m.__eye };
   sprite(eye, PET_X + P.eyes.lx, PET_Y + dy + P.eyes.y);
   sprite(eye, PET_X + P.eyes.rx, PET_Y + dy + P.eyes.y);
+  skinMap = m;
   P.face(dy);
   const acc = ACC_ITEMS[petAcc];
   if (acc && acc.draw) acc.draw(P, dy);
@@ -696,18 +1146,24 @@ function drawFloorShadow() {
 }
 
 function drawDesk() {
+  const st = DESK_STYLES[deskStyle] || DESK_STYLES.basic;
   rect(1, DESK_Y, 42, 1, 'k');
-  rect(1, DESK_Y + 1, 42, 1, 't');
+  rect(1, DESK_Y + 1, 42, 1, st.top);
   rect(1, DESK_Y + 2, 1, 1, 'k');
-  rect(2, DESK_Y + 2, 40, 1, 'y');
+  rect(2, DESK_Y + 2, 40, 1, st.stripe);
   rect(42, DESK_Y + 2, 1, 1, 'k');
   rect(1, DESK_Y + 3, 42, 1, 'k');
+  // 대리석 결
+  if (st.vein) {
+    for (const vx of [6, 14, 23, 31, 38]) px(vx, DESK_Y + 1, st.vein);
+    for (const vx of [10, 27, 35]) px(vx, DESK_Y + 2, st.vein);
+  }
   // 다리
   rect(2, 20, 1, 3, 'k');
-  rect(3, 20, 2, 3, 'T');
+  rect(3, 20, 2, 3, st.leg);
   rect(5, 20, 1, 3, 'k');
   rect(38, 20, 1, 3, 'k');
-  rect(39, 20, 2, 3, 'T');
+  rect(39, 20, 2, 3, st.leg);
   rect(41, 20, 1, 3, 'k');
 }
 
@@ -722,12 +1178,25 @@ function drawMonitor(now, typing) {
   sprite4(CLAWD, 70, 13 + hop);
 }
 
-function drawKeyboard() {
+// 기계식 키보드의 파스텔 키캡 색 (열마다 순환)
+const MECH_CAPS = ['#e8c8f0', '#a7e0b8', '#a9c1dd', '#f7c948', '#e79aa8'];
+
+function drawKeyboard(now, typing) {
+  const mech = kbStyle === 'mech';
   rect4(KB.x, KB.y, KB.w, KB.h, 'k');
-  rect4(KB.x + 1, KB.y + 1, KB.w - 2, KB.h - 2, 'g');
+  rect4(KB.x + 1, KB.y + 1, KB.w - 2, KB.h - 2, mech ? '#2f2b38' : 'g');
+  // 타이핑 중엔 키가 하나씩 눌린다 — 빠르게 옮겨 다니며 콩콩
+  const pressedIdx = mech && typing ? (Math.floor(now / 140) * 7) % 24 : -1;
+  let i = 0;
   for (let ky = KB.y + 2; ky < KB.y + KB.h - 1; ky += 2) {
     for (let kx = KB.x + 2; kx < KB.x + KB.w - 2; kx += 2) {
-      px4(kx, ky, 'h');
+      if (mech) {
+        const pressed = i === pressedIdx;
+        px4(kx, ky + (pressed ? 1 : 0), pressed ? '#8f8f98' : MECH_CAPS[i % 5]);
+      } else {
+        px4(kx, ky, 'h');
+      }
+      i++;
     }
   }
 }
@@ -771,11 +1240,17 @@ if (window.pet) window.pet.onPetSize(setPetSize);
 let petKind = params.get('pet') || localStorage.getItem('petKind') || 'cat';
 if (!PET_DEFS[petKind]) petKind = 'cat';
 
-/* 꾸미기 선택 (책상 소품 / 액세서리) — 레벨로 잠금 해제 */
+/* 꾸미기 선택 (책상 소품 / 액세서리 / 스킨 / 책상 / 키보드) — 레벨·업적으로 잠금 해제 */
 let deskItem = params.get('desk') || localStorage.getItem('deskItem') || 'coffee';
 if (!DESK_ITEMS[deskItem]) deskItem = 'coffee';
 let petAcc = params.get('acc') || localStorage.getItem('petAcc') || 'none';
 if (!ACC_ITEMS[petAcc]) petAcc = 'none';
+let petSkin = params.get('skin') || localStorage.getItem('petSkin') || 'none';
+if (!SKINS[petSkin]) petSkin = 'none';
+let deskStyle = params.get('deskstyle') || localStorage.getItem('deskStyle') || 'basic';
+if (!DESK_STYLES[deskStyle]) deskStyle = 'basic';
+let kbStyle = params.get('kb') || localStorage.getItem('kbStyle') || 'basic';
+if (!KB_ITEMS[kbStyle]) kbStyle = 'basic';
 
 const startTime = performance.now();
 
@@ -942,6 +1417,15 @@ const game = {
   demoted: false, // 이번 세션에서 강등됐는가 — 세션당 한 번만 떨어진다
 };
 
+/* ?lv=30 — 테스트 모드: 레벨을 잠깐 올려 잠금 해제를 눈으로 확인한다.
+ * 저장·업로드·동기화가 전부 꺼져 실제 진행과 리더보드에 아무 흔적도 안 남는다 */
+const SANDBOX_LEVEL = Math.max(0, Math.floor(+params.get('lv')) || 0);
+const SANDBOX = SANDBOX_LEVEL > 0;
+if (SANDBOX) {
+  game.level = SANDBOX_LEVEL;
+  game.xp = 0;
+}
+
 const hudLevel = document.getElementById('hud-level');
 const hudXp = document.getElementById('hud-xp');
 const xpFill = document.getElementById('xpfill');
@@ -949,6 +1433,7 @@ const toastEl = document.getElementById('toast');
 let toastTimer = null;
 
 function saveGame() {
+  if (SANDBOX) return;
   try {
     localStorage.setItem('petLevel', game.level);
     localStorage.setItem('petXp', game.xp);
@@ -991,9 +1476,11 @@ function addXp(n) {
   if (leveled) {
     state.celebrateUntil = performance.now() + CELEBRATE_MS;
     if (window.pet) window.pet.notify('🎉 레벨 업!', `펫이 Lv.${game.level}이 되었어요!`);
-    // 이번 레벨 업으로 새로 열린 꾸미기 아이템 알림
-    const news = [...Object.values(DESK_ITEMS), ...Object.values(ACC_ITEMS)]
-      .filter((it) => it.lv > prevLevel && it.lv <= game.level);
+    // 이번 레벨 업으로 새로 열린 꾸미기 아이템 알림 (업적 아이템은 레벨과 무관)
+    const news = [
+      ...Object.values(DESK_ITEMS), ...Object.values(ACC_ITEMS),
+      ...Object.values(SKINS), ...Object.values(DESK_STYLES), ...Object.values(KB_ITEMS),
+    ].filter((it) => !it.ach && it.lv > prevLevel && it.lv <= game.level);
     if (news.length) showToast(`🔓 해제: ${news.map((it) => `${it.emoji} ${it.label}`).join(', ')}`);
     pushScore();
   }
@@ -1014,9 +1501,185 @@ function showToast(msg) {
   toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 4000);
 }
 
-// 1초마다 세션 점수 정산
+/* ================================================================
+ * 업적 / 통계 — 레벨이 아닌 "행동"으로 열리는 히든 콘텐츠
+ * ================================================================ */
+function loadStats() {
+  try {
+    const s = JSON.parse(localStorage.getItem('petStats') || '{}');
+    return {
+      pomos: Math.max(0, Math.floor(+s.pomos) || 0),
+      keys: Math.max(0, Math.floor(+s.keys) || 0),
+      early: !!s.early,
+      top1: !!s.top1,
+      bestStreak: Math.max(0, Math.floor(+s.bestStreak) || 0),
+      visitors: s.visitors && typeof s.visitors === 'object' ? s.visitors : {},
+      pomoMonths: s.pomoMonths && typeof s.pomoMonths === 'object' ? s.pomoMonths : {},
+      done: Array.isArray(s.done) ? s.done : [],
+    };
+  } catch (_) {
+    return {
+      pomos: 0, keys: 0, early: false, top1: false, bestStreak: 0,
+      visitors: {}, pomoMonths: {}, done: [],
+    };
+  }
+}
+
+const stats = loadStats();
+
+function saveStats() {
+  if (SANDBOX) return;
+  try { localStorage.setItem('petStats', JSON.stringify(stats)); } catch (_) { /* 무시 */ }
+}
+
+const ACHIEVEMENTS = {
+  pomo100: {
+    emoji: '🍅', label: '토마토 농장주', desc: '뽀모도로 100회 완주',
+    goal: 100, val: () => stats.pomos, reward: 'tomato',
+  },
+  streak30: {
+    emoji: '🔥', label: '불타는 연속', desc: '30일 연속 잔디 심기',
+    goal: 30, val: () => Math.max(stats.bestStreak, currentStreak()), reward: 'campfire',
+  },
+  early5: {
+    emoji: '☀️', label: '얼리버드', desc: '새벽 5시에 일하기',
+    goal: 1, val: () => (stats.early ? 1 : 0), reward: 'sun',
+  },
+  top1: {
+    emoji: '🏆', label: '정상 정복', desc: '리더보드 1위 달성',
+    goal: 1, val: () => (stats.top1 ? 1 : 0), reward: 'trophy',
+  },
+  keys100k: {
+    emoji: '⌨️', label: '타이핑 마스터', desc: '누적 10만 타 입력',
+    goal: 100000, val: () => stats.keys,
+  },
+  collector: {
+    emoji: '🦋', label: '방문객 친구', desc: '방문객 5종 모두 만나기',
+    goal: 5, val: () => Object.keys(stats.visitors).length,
+  },
+  // ---- 계절 이벤트 — 매년 그 달에 뽀모도로 20회 완주하면 스킨+소품 세트를 준다 ----
+  eventGhost: {
+    emoji: '🎃', label: '할로윈 준비', desc: '9월 한 달간 뽀모도로 20회 완주',
+    goal: 20, val: () => monthPomos('09'), reward: ['ghost', 'pumpkin'],
+  },
+  eventIce: {
+    emoji: '🎄', label: '겨울 준비', desc: '11월 한 달간 뽀모도로 20회 완주',
+    goal: 20, val: () => monthPomos('11'), reward: ['ice', 'tree'],
+  },
+};
+
+/* 보상은 하나(문자열)일 수도, 세트(배열)일 수도 있다 — 소품/스킨 어느 쪽이든 */
+function rewardItems(a) {
+  if (!a.reward) return [];
+  const keys = Array.isArray(a.reward) ? a.reward : [a.reward];
+  return keys.map((k) => DESK_ITEMS[k] || SKINS[k]).filter(Boolean);
+}
+
+/* 그 달(어느 해든)에 완주한 뽀모도로 최고 기록 — 이벤트는 매년 돌아온다 */
+function monthPomos(mm) {
+  let best = 0;
+  for (const [k, v] of Object.entries(stats.pomoMonths)) {
+    if (k.endsWith(`-${mm}`)) best = Math.max(best, +v || 0);
+  }
+  return best;
+}
+
+// 테스트 모드에서 ?ach=1 이면 업적도 전부 열어 본다 (저장 안 됨)
+if (SANDBOX && params.get('ach') === '1') {
+  stats.done = Object.keys(ACHIEVEMENTS);
+}
+
+function achUnlocked(id) {
+  return stats.done.includes(id);
+}
+
+/* 잠긴 아이템이 장착된 채로 시작하면(테스트 모드에서 골랐거나 데이터가 꼬였거나)
+ * 기본값으로 되돌린다. 데모 URL 파라미터로 지정한 경우는 그대로 둔다 */
+(function sanitizeEquipped() {
+  if (SANDBOX || params.get('desk') || params.get('acc') || params.get('skin') ||
+      params.get('deskstyle') || params.get('kb')) return;
+  const locked = (it) => (it.ach ? !achUnlocked(it.ach) : it.lv > game.level);
+  const fix = [
+    ['deskItem', DESK_ITEMS[deskItem], 'coffee', (v) => { deskItem = v; }],
+    ['petAcc', ACC_ITEMS[petAcc], 'none', (v) => { petAcc = v; }],
+    ['petSkin', SKINS[petSkin], 'none', (v) => { petSkin = v; }],
+    ['deskStyle', DESK_STYLES[deskStyle], 'basic', (v) => { deskStyle = v; }],
+    ['kbStyle', KB_ITEMS[kbStyle], 'basic', (v) => { kbStyle = v; }],
+  ];
+  for (const [key, it, def, set] of fix) {
+    if (!locked(it)) continue;
+    set(def);
+    try { localStorage.setItem(key, def); } catch (_) { /* 무시 */ }
+  }
+})();
+
+function checkAchievements() {
+  for (const [id, a] of Object.entries(ACHIEVEMENTS)) {
+    if (stats.done.includes(id) || a.val() < a.goal) continue;
+    stats.done.push(id);
+    saveStats();
+    state.celebrateUntil = performance.now() + CELEBRATE_MS;
+    const rewards = rewardItems(a);
+    const rewardMsg = rewards.map((r) => `${r.emoji} ${r.label}`).join(', ');
+    showToast(`🏅 업적 달성: ${a.label}!${rewardMsg ? ` — ${rewardMsg} 해제` : ''}`);
+    if (window.pet) window.pet.notify('🏅 업적 달성!', `${a.label} — ${a.desc}`);
+  }
+  if (typeof achPanel !== 'undefined' && !achPanel.classList.contains('hidden')) renderAch();
+}
+
+/* ================================================================
+ * 방문객 — 일하는 중에 가끔 책상에 놀러 온다 (도감에 기록)
+ * ================================================================ */
+const VISITORS = {
+  // 나비는 화분에 꽃이 핀 뒤(Lv.42)에야 찾아온다
+  butterfly: { emoji: '🦋', label: '나비', weight: 4, dur: 18000, minLv: 42 },
+  bird: { emoji: '🐦', label: '참새', weight: 3, dur: 15000 },
+  ladybug: { emoji: '🐞', label: '무당벌레', weight: 3, dur: 20000 },
+  snail: { emoji: '🐌', label: '달팽이', weight: 2, dur: 28000 },
+  firefly: { emoji: '✨', label: '반딧불이', weight: 2, dur: 20000, night: true },
+};
+
+const visitor = { kind: null, start: 0, until: 0 };
+
+function spawnVisitor(kind, { record = true } = {}) {
+  const v = VISITORS[kind];
+  if (!v) return;
+  const now = performance.now();
+  visitor.kind = kind;
+  visitor.start = now;
+  visitor.until = now + v.dur;
+  showToast(`${v.emoji} ${v.label}가 놀러 왔어요!`);
+  if (!record) return; // 데모/스크린샷 소환은 도감에 남기지 않는다
+  stats.visitors[kind] = (stats.visitors[kind] || 0) + 1;
+  saveStats();
+  checkAchievements();
+}
+
+/* 평균 15분에 한 번쯤 — 오래 일할수록 많이 만난다 */
+function maybeSpawnVisitor() {
+  if (visitor.kind || Math.random() > 1 / 900) return;
+  const night = isNight();
+  const pool = Object.entries(VISITORS).filter(([, v]) =>
+    (!v.night || night) && (!v.minLv || game.level >= v.minLv));
+  const total = pool.reduce((s, [, v]) => s + v.weight, 0);
+  let roll = Math.random() * total;
+  for (const [k, v] of pool) {
+    roll -= v.weight;
+    if (roll <= 0) return spawnVisitor(k);
+  }
+}
+
+// 1초마다 세션 점수 정산 + 업적 체크
 setInterval(() => {
+  // 얼리버드 — 새벽 5시대에 일 세션이나 집중 타이머가 돌고 있으면
+  if (!stats.early && new Date().getHours() === 5 &&
+      ((game.working && !game.away) || (timer.running && timer.label !== '휴식'))) {
+    stats.early = true;
+    saveStats();
+    checkAchievements();
+  }
   if (!game.working || game.away) return;
+  maybeSpawnVisitor();
   const now = performance.now();
   let delta = 0;
   if (state.nagging) delta = -2;
@@ -1077,12 +1740,19 @@ function sbRpc(fn, args) {
   return sbFetch(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) });
 }
 
-// 서버가 아직 잔디 칼럼을 모르는 경우(스키마 미적용) 점수까지 막히지 않게 한 번만 물러선다
+// 서버가 아직 잔디/꾸미기 칼럼을 모르는 경우(스키마 미적용) 점수까지 막히지 않게 한 번만 물러선다
 let pomoSyncOff = false;
+let decoSyncOff = false;
+
+/* 지금 착용 중인 꾸미기 한 벌 — 서버에 올려 두면 친구들이 책상 구경을 할 수 있다 */
+function currentDeco() {
+  return { desk: deskItem, acc: petAcc, skin: petSkin, deskStyle, kb: kbStyle };
+}
 
 /* 점수 업로드. interactive는 "사용자가 방금 저장을 눌렀다"는 뜻 —
  * 펫 교체나 자동 저장 같은 배경 업로드가 뜬금없이 말풍선을 띄우면 안 된다 */
 async function pushScore({ interactive = false } = {}) {
+  if (SANDBOX) return false; // 테스트 레벨을 리더보드에 올리면 안 된다
   if (!nickname || !syncCode) return false;
   const args = {
     p_nickname: nickname,
@@ -1092,14 +1762,30 @@ async function pushScore({ interactive = false } = {}) {
     p_pet: petKind,
   };
   const withPomo = { ...args, p_device: deviceId, p_pomo: pomoMine };
+  const withDeco = { ...withPomo, p_deco: currentDeco() };
   try {
     let res;
     try {
-      res = await sbRpc('upsert_score', pomoSyncOff ? args : withPomo);
+      res = await sbRpc('upsert_score',
+        decoSyncOff ? (pomoSyncOff ? args : withPomo) : withDeco);
     } catch (err) {
-      if (pomoSyncOff || !`${err.message}`.includes('404')) throw err;
-      pomoSyncOff = true; // 옛 스키마 — 잔디 없이 다시
-      res = await sbRpc('upsert_score', args);
+      if (!`${err.message}`.includes('404')) throw err;
+      // 스키마가 낡은 순서대로 한 단계씩 물러선다: deco 빼고 → 잔디도 빼고
+      if (!decoSyncOff) {
+        decoSyncOff = true;
+        try {
+          res = await sbRpc('upsert_score', pomoSyncOff ? args : withPomo);
+        } catch (err2) {
+          if (pomoSyncOff || !`${err2.message}`.includes('404')) throw err2;
+          pomoSyncOff = true;
+          res = await sbRpc('upsert_score', args);
+        }
+      } else if (!pomoSyncOff) {
+        pomoSyncOff = true;
+        res = await sbRpc('upsert_score', args);
+      } else {
+        throw err;
+      }
     }
     if (res && res.error) {
       if (res.error === 'nickname_taken') {
@@ -1156,14 +1842,40 @@ function adoptState(s) {
     petKind = s.pet;
     try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
   }
+  // 다른 PC에서 고른 꾸미기 한 벌도 그대로 입는다
+  if (s.deco && typeof s.deco === 'object') {
+    const d = s.deco;
+    try {
+      if (DESK_ITEMS[d.desk]) { deskItem = d.desk; localStorage.setItem('deskItem', d.desk); }
+      if (ACC_ITEMS[d.acc]) { petAcc = d.acc; localStorage.setItem('petAcc', d.acc); }
+      if (SKINS[d.skin]) { petSkin = d.skin; localStorage.setItem('petSkin', d.skin); }
+      if (DESK_STYLES[d.deskStyle]) { deskStyle = d.deskStyle; localStorage.setItem('deskStyle', d.deskStyle); }
+      if (KB_ITEMS[d.kb]) { kbStyle = d.kb; localStorage.setItem('kbStyle', d.kb); }
+    } catch (_) { /* 무시 */ }
+  }
   adoptOthers(s.pomo_others);
   saveGame();
   try { localStorage.setItem('lastPushAt', s.updated_at || ''); } catch (_) { /* 무시 */ }
   updateHud();
 }
 
+/* 리더보드 1위인지 확인 — 업적 "정상 정복" 판정 */
+async function checkTop1(rows) {
+  try {
+    const top = rows ||
+      await sbFetch(`${SB_TABLE}?select=nickname&order=level.desc,xp.desc&limit=1`);
+    if (!stats.top1 && nickname && top && top[0] &&
+        top[0].nickname.toLowerCase() === nickname.toLowerCase()) {
+      stats.top1 = true;
+      saveStats();
+      checkAchievements();
+    }
+  } catch (_) { /* 오프라인 — 다음에 */ }
+}
+
 // 시작 시 동기화: 다른 PC가 더 최근에 저장했으면 서버 상태를 가져온다
 async function syncOnStart() {
+  if (SANDBOX) return; // 테스트 모드 — 서버 상태로 되돌리지도, 덮지도 않는다
   if (!nickname) return;
   if (!syncCode) {
     // v1 사용자: 코드를 만들어 기존 랭킹 행을 선점한다.
@@ -1190,34 +1902,125 @@ async function syncOnStart() {
     adoptState(res);
     showToast('다른 PC의 진행 상황을 불러왔어요 ✨');
   } catch (_) { /* 오프라인 등 — 로컬 유지 */ }
-}
-
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
+  checkTop1();
 }
 
 const rankList = document.getElementById('rank-list');
 
+/* 레벨 배지 — 리더보드에서 고레벨이 한눈에 보인다 */
+function lvBadge(lv) {
+  return lv >= 30 ? ' 💎' : lv >= 20 ? ' 🌟' : lv >= 10 ? ' ⭐' : '';
+}
+
 async function loadRanking() {
   rankList.innerHTML = '<li>불러오는 중…</li>';
+  hideRankPreview();
   try {
-    const rows = await sbFetch(
-      `${SB_TABLE}?select=nickname,level,xp,pet&order=level.desc,xp.desc&limit=10`
-    );
+    let rows;
+    try {
+      rows = await sbFetch(
+        `${SB_TABLE}?select=nickname,level,xp,pet,deco&order=level.desc,xp.desc&limit=10`
+      );
+    } catch (err) {
+      // 옛 스키마 — deco 칼럼이 없으면 빼고 다시
+      if (!/40[04]/.test(`${err.message}`)) throw err;
+      rows = await sbFetch(
+        `${SB_TABLE}?select=nickname,level,xp,pet&order=level.desc,xp.desc&limit=10`
+      );
+    }
     if (!rows || !rows.length) {
       rankList.innerHTML = '<li>아직 아무도 없어요 — 닉네임을 저장해 보세요!</li>';
       return;
     }
-    rankList.innerHTML = rows.map((r, i) => {
-      const me = r.nickname.toLowerCase() === nickname.toLowerCase() ? ' ⭐' : '';
-      return `<li>${i + 1}위 ${PET_EMOJI[r.pet] || '🐾'} ${escapeHtml(r.nickname)}` +
-        ` — Lv.${r.level} (${r.xp})${me}</li>`;
-    }).join('');
+    rankList.replaceChildren(...rows.map((r, i) => {
+      const li = document.createElement('li');
+      li.textContent =
+        `${i + 1}위 ${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}${lvBadge(r.level)}` +
+        ` — Lv.${r.level} (${r.xp})`;
+      if (nickname && r.nickname.toLowerCase() === nickname.toLowerCase()) {
+        li.classList.add('me');
+      }
+      if (DESK_PREVIEW_ENABLED) {
+        li.title = '클릭하면 책상 구경 👀';
+        li.addEventListener('click', () => toggleRankPreview(r));
+      }
+      return li;
+    }));
+    checkTop1(rows);
   } catch (err) {
     rankList.innerHTML = '<li>불러오기 실패 — 네트워크나 테이블을 확인해 주세요</li>';
   }
+}
+
+/* ---- 친구 책상 구경 — 랭킹 줄을 클릭하면 그 사람의 펫+꾸미기를 미니 캔버스에 그린다.
+ * 아직 다듬는 중이라 이번 버전에서는 잠가 둔다 — ?preview=1 로만 미리 볼 수 있고,
+ * 꾸미기 서버 동기화(deco)는 멀티 PC 동기화용으로 계속 동작한다 ---- */
+const DESK_PREVIEW_ENABLED = false;
+const rankPreviewEl = document.getElementById('rank-preview');
+const previewCanvas = document.getElementById('preview-canvas');
+const previewName = document.getElementById('preview-name');
+let previewNick = '';
+
+function hideRankPreview() {
+  rankPreviewEl.classList.add('hidden');
+  previewNick = '';
+}
+
+function toggleRankPreview(r) {
+  if (previewNick === r.nickname) {
+    hideRankPreview();
+    return;
+  }
+  previewNick = r.nickname;
+  renderDeskPreview(r);
+  previewName.textContent = `${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}의 책상`;
+  rankPreviewEl.classList.remove('hidden');
+}
+
+/* 그리기 헬퍼가 전부 전역 ctx/SCALE을 쓰므로, 잠깐 미니 캔버스로 바꿔
+ * 정지 화면 한 장을 그리고 원래대로 되돌린다 (동기라 렌더 루프와 안 겹친다) */
+function renderDeskPreview(r) {
+  const saved = { ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle };
+  const d = (r.deco && typeof r.deco === 'object') ? r.deco : {};
+  ctx = previewCanvas.getContext('2d');
+  SCALE = 4;
+  HALF = 2;
+  previewCanvas.width = SCENE_W * SCALE;
+  previewCanvas.height = SCENE_H * SCALE;
+  ctx.imageSmoothingEnabled = false;
+  petKind = PET_DEFS[r.pet] ? r.pet : 'cat';
+  deskItem = DESK_ITEMS[d.desk] ? d.desk : 'coffee';
+  petAcc = ACC_ITEMS[d.acc] ? d.acc : 'none';
+  petSkin = SKINS[d.skin] ? d.skin : 'none';
+  deskStyle = DESK_STYLES[d.deskStyle] ? d.deskStyle : 'basic';
+  kbStyle = KB_ITEMS[d.kb] ? d.kb : 'basic';
+  previewLevel = Math.max(1, +r.level || 1); // 화분은 그 사람 레벨만큼 자라 있다
+
+  ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  drawFloorShadow();
+  skinMap = petSkinMap(0);
+  renderPet(EYE_OPEN, 0);
+  skinMap = null;
+  drawSkinSparkle(0, 0);
+  drawDesk();
+  const below = PET_DEFS[petKind].below;
+  if (below) {
+    skinMap = petSkinMap(0);
+    below(0);
+    skinMap = null;
+  }
+  DESK_ITEMS[deskItem].draw(0);
+  drawMonitor(0, false);
+  drawKeyboard(0, false);
+  drawMouse(0);
+  skinMap = petSkinMap(0);
+  const paw = PET_DEFS[petKind].paw;
+  sprite(paw, PAW_L, PAW_REST);
+  sprite(paw, PAW_R, PAW_REST);
+  skinMap = null;
+
+  ({ ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle } = saved);
+  previewLevel = null;
 }
 
 // 일하는 중엔 5분마다 점수 자동 업로드
@@ -1227,6 +2030,128 @@ setInterval(() => {
 
 const CELEBRATE_MS = 4000;
 const SAD_MS = 4000;
+
+/* ---------------- 밤 연출 ----------------
+ * 저녁 8시~새벽 6시엔 장면이 어두워지고 달이 뜬다.
+ * 무드등은 밤에 빛무리가 커진다 (?night=1 로 강제) */
+const DEMO_NIGHT = params.get('night');
+
+function isNight() {
+  if (DEMO_NIGHT) return DEMO_NIGHT === '1';
+  const h = new Date().getHours();
+  return h >= 20 || h < 6;
+}
+
+const MOON = [
+  '..WW',
+  '.WW.',
+  '.WW.',
+  '..WW',
+];
+
+/* ---------------- 방문객 스프라이트 ---------------- */
+const BFLY_A = [
+  'ss.k.ss',
+  'sssksss',
+  '.spkps.',
+];
+const BFLY_B = [
+  '.s.k.s.',
+  '.sskss.',
+  '..pkp..',
+];
+const BIRD_A = [
+  '...kkk...',
+  '..keeek..',
+  '.Xkekeek.',
+  '..kfffek.',
+  '..kffeek.',
+  '...kkkk..',
+  '...k..k..',
+];
+const BIRD_B = [
+  '...kkk...',
+  '..keeek..',
+  '.Xkekeek.',
+  '..keeeek.',
+  '..kffeek.',
+  '...kkkk..',
+  '....kk...',
+];
+const SNAIL_A = [
+  '..kkkk..k.',
+  '.kLDDLk.C.',
+  'kLDLLDLkC.',
+  'kLDDDDLkCC',
+  'kCCCCCCCCC',
+  '.kkkkkkkkk',
+];
+const SNAIL_B = [
+  '..kkkk.k..',
+  '.kLDDLk.C.',
+  'kLDLLDLkC.',
+  'kLDDDDLkCC',
+  'kCCCCCCCCC',
+  '.kkkkkkkkk',
+];
+const LADYBUG = [
+  '.kkkk.',
+  'kRkkRk',
+  'kRRRRk',
+  'kRkkRk',
+  '.kkkk.',
+];
+
+function drawVisitor(now) {
+  if (!visitor.kind) return;
+  if (now > visitor.until) {
+    visitor.kind = null;
+    return;
+  }
+  const t = now - visitor.start;
+  const flap = Math.floor(now / 220) % 2;
+  switch (visitor.kind) {
+    case 'butterfly': {
+      // 커피 위쪽 하늘을 팔랑팔랑
+      const ox = 10 + Math.round(Math.sin(now / 800) * 7);
+      const oy = 13 + Math.round(Math.sin(now / 470) * 4);
+      sprite4(flap ? BFLY_A : BFLY_B, ox, oy);
+      break;
+    }
+    case 'bird':
+      // 모니터 위에 앉아 쉰다
+      sprite4(flap ? BIRD_A : BIRD_B, 71, 2);
+      break;
+    case 'snail': {
+      // 바닥을 왼쪽에서 오른쪽으로 느릿느릿
+      const ox = Math.round(-10 + (t / VISITORS.snail.dur) * 100);
+      sprite4(Math.floor(now / 600) % 2 ? SNAIL_A : SNAIL_B, ox, 41);
+      break;
+    }
+    case 'ladybug': {
+      // 책상 앞면(커피 왼쪽)을 종종종
+      const ph = (now / 1400) % 2;
+      const ox = 3 + Math.round((ph < 1 ? ph : 2 - ph) * 16);
+      sprite4(LADYBUG, ox, 33);
+      break;
+    }
+    case 'firefly': {
+      // 밤하늘을 떠다니는 불빛 (전체 픽셀 좌표)
+      const fx = 20 + Math.sin(now / 1300) * 16;
+      const fy = 9 + Math.sin(now / 900 + 1.7) * 5;
+      const a = 0.25 + 0.15 * Math.sin(now / 300);
+      const g = ctx.createRadialGradient(
+        (fx + 0.5) * SCALE, (fy + 0.5) * SCALE, 0,
+        (fx + 0.5) * SCALE, (fy + 0.5) * SCALE, 4 * SCALE);
+      g.addColorStop(0, `rgba(247,238,120,${a.toFixed(3)})`);
+      g.addColorStop(1, 'rgba(247,238,120,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect((fx - 4) * SCALE, (fy - 4) * SCALE, 8 * SCALE, 8 * SCALE);
+      px(Math.round(fx), Math.round(fy), 'y');
+      break;
+    }
+  }
+}
 
 /* ---------------- 렌더 루프 ----------------
  * 가만히 있을 땐 80ms(~12.5fps)로 제한해 CPU/GPU를 아끼고,
@@ -1239,7 +2164,7 @@ let lastFrame = 0;
 function render(now) {
   requestAnimationFrame(render);
   const active = now - state.lastKey < 600 || now - state.lastMouse < 600 ||
-    now < state.celebrateUntil || now < state.sadUntil;
+    now < state.celebrateUntil || now < state.sadUntil || !!visitor.kind;
   if (now - lastFrame < (active ? FRAME_ACTIVE_MS : FRAME_MS)) return;
   lastFrame = now;
 
@@ -1272,7 +2197,10 @@ function render(now) {
     if (now < state.blinkUntil) eye = EYE_BLINK;
   }
 
+  skinMap = petSkinMap(now);
   renderPet(eye, dy);
+  skinMap = null;
+  drawSkinSparkle(now, dy);
 
   const typing = mode === 'typing';
   // 키보드가 더 최근 입력이면 타이핑이 양발을 차지한다 —
@@ -1284,13 +2212,18 @@ function render(now) {
 
   drawDesk();
   const below = PET_DEFS[petKind].below;
-  if (below) below(now);
+  if (below) {
+    skinMap = petSkinMap(now);
+    below(now);
+    skinMap = null;
+  }
   DESK_ITEMS[deskItem].draw(now);
   drawMonitor(now, typing);
-  drawKeyboard();
+  drawKeyboard(now, typing);
   drawMouse(wiggle);
 
   const paw = PET_DEFS[petKind].paw;
+  skinMap = petSkinMap(now);
   if (mode === 'celebrating') {
     sprite(paw, PAW_L, PAW_REST - 2);
     sprite(paw, PAW_R, PAW_REST - 2);
@@ -1306,6 +2239,7 @@ function render(now) {
       sprite(paw, PAW_R, rightY);
     }
   }
+  skinMap = null;
 
   if (typing) {
     const ph = Math.floor(now / 160) % 3;
@@ -1335,6 +2269,26 @@ function render(now) {
       px(cx2, Math.floor(t), i % 2 ? 's' : 'S');
     }
   }
+
+  // 밤 — 장면을 살짝 어둡게 하고 달과 별을 띄운다.
+  // source-atop: 이미 그려진 픽셀에만 어둠을 입힌다 — 투명 배경(바탕화면)까지
+  // 칠하면 창 전체에 어두운 상자가 보인다
+  const night = isNight();
+  if (night) {
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = 'rgba(24,28,58,0.28)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'source-over';
+    sprite(MOON, 38, 0);
+    if (Math.floor(now / 900) % 2) px(35, 2, 'y');
+    if (Math.floor(now / 1300) % 2) px(42, 3, 'W');
+  }
+
+  drawVisitor(now);
+
+  // 무드등 빛무리 — 밤 오버레이 위에 그려야 어둠을 뚫고 빛난다
+  const di = DESK_ITEMS[deskItem];
+  if (di.glow) di.glow(now, night);
 }
 requestAnimationFrame(render);
 
@@ -1345,6 +2299,12 @@ if (window.pet) {
     if (type === 'key') {
       state.lastKey = now;
       state.pawFlip = !state.pawFlip;
+      // 누적 타이핑 통계 — 저장은 100타마다 한 번만
+      stats.keys += 1;
+      if (stats.keys % 100 === 0) {
+        saveStats();
+        checkAchievements();
+      }
     } else {
       state.lastMouse = now;
     }
@@ -1442,6 +2402,13 @@ function finishTimer() {
     savePomoMine();
     if (!grassPanel.classList.contains('hidden')) renderGrass();
     pushScore(); // 다른 PC에서도 보이게 바로 올린다
+    // 업적 통계 — 완주 횟수, 이벤트용 월별 횟수, 최고 연속 기록
+    stats.pomos += 1;
+    const mk = k.slice(0, 7); // 'YYYY-MM'
+    stats.pomoMonths[mk] = (stats.pomoMonths[mk] || 0) + 1;
+    stats.bestStreak = Math.max(stats.bestStreak, currentStreak());
+    saveStats();
+    checkAchievements();
   }
 
   if (window.pet) {
@@ -1557,7 +2524,7 @@ const grassPanel = document.getElementById('grass-panel');
 const decoPanel = document.getElementById('deco-panel');
 
 function openPanel(target) {
-  for (const p of [panel, rankPanel, grassPanel, decoPanel]) {
+  for (const p of [panel, rankPanel, grassPanel, decoPanel, achPanel]) {
     if (p !== target) p.classList.add('hidden');
   }
   return !target.classList.toggle('hidden');
@@ -1709,58 +2676,139 @@ btnAway.addEventListener('click', () => {
   updateHud();
 });
 
-/* ---- 꾸미기 패널 (펫 / 책상 소품 / 액세서리) ---- */
+/* ---- 꾸미기 패널 (펫 / 스킨 / 책상 소품 / 액세서리 / 책상 / 키보드) ---- */
 let petPushTimer = null;
 
-function decoButton(emoji, label, selected, lockLv, pick) {
+/* 무엇을 고르든 서버에도 반영 — 연타하며 고를 수 있으니 멈춘 뒤 한 번만 */
+function queueDecoPush() {
+  clearTimeout(petPushTimer);
+  petPushTimer = setTimeout(pushScore, 2000);
+}
+
+function decoButton(emoji, label, selected, it, pick) {
   const btn = document.createElement('button');
-  const locked = lockLv > game.level;
-  btn.textContent = locked ? `🔒${lockLv}` : emoji;
-  btn.title = locked ? `${label} — Lv.${lockLv}에 열려요` : label;
+  const byAch = !!(it && it.ach);
+  const locked = byAch ? !achUnlocked(it.ach) : (it ? it.lv : 1) > game.level;
+  const hint = byAch
+    ? `업적 「${ACHIEVEMENTS[it.ach].label}」(${ACHIEVEMENTS[it.ach].desc})을 달성하면 열려요`
+    : `Lv.${it && it.lv}이 되면 열려요`;
+  btn.textContent = locked ? (byAch ? '❓' : `🔒${it.lv}`) : emoji;
+  btn.title = locked ? `${label} — ${hint}` : label;
   btn.classList.toggle('sel', selected);
   btn.classList.toggle('lock', locked);
   btn.addEventListener('click', () => {
     if (locked) {
-      showToast(`🔒 ${label}은(는) Lv.${lockLv}이 되면 열려요`);
+      showToast(byAch ? `❓ ${hint}` : `🔒 ${label}은(는) Lv.${it.lv}이 되면 열려요`);
       return;
     }
     pick();
+    queueDecoPush();
     renderDeco();
   });
   return btn;
 }
 
+/* 무엇으로 바뀌었는지 말풍선으로 알려 준다 — 아이콘만으로는 뭔지 모른다 */
+function decoRow(elId, items, getSel, setSel, storeKey, say) {
+  document.getElementById(elId).replaceChildren(
+    ...Object.entries(items).map(([k, it]) =>
+      decoButton(it.emoji, it.label, getSel() === k, it, () => {
+        if (getSel() === k) return; // 이미 고른 것 — 말풍선까지 띄울 일은 아니다
+        setSel(k);
+        try { localStorage.setItem(storeKey, k); } catch (_) { /* 무시 */ }
+        showToast(say(it, k));
+      })));
+}
+
+const PET_LABELS = { cat: '고양이', dog: '강아지', rabbit: '토끼', hamster: '햄스터', otter: '해달' };
+
 function renderDeco() {
   const pets = document.getElementById('deco-pets');
   pets.replaceChildren(...PET_ORDER.map((k) =>
-    decoButton(PET_EMOJI[k], k, petKind === k, 1, () => {
+    decoButton(PET_EMOJI[k], PET_LABELS[k], petKind === k, null, () => {
+      if (petKind === k) return;
       petKind = k;
       try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
-      // 연타하며 고를 수 있으니 멈춘 뒤 한 번만 업로드
-      clearTimeout(petPushTimer);
-      petPushTimer = setTimeout(pushScore, 2000);
+      showToast(`${PET_EMOJI[k]} ${PET_LABELS[k]}로 변신!`);
     })));
 
-  const desk = document.getElementById('deco-desk');
-  desk.replaceChildren(...Object.entries(DESK_ITEMS).map(([k, it]) =>
-    decoButton(it.emoji, it.label, deskItem === k, it.lv, () => {
-      deskItem = k;
-      try { localStorage.setItem('deskItem', k); } catch (_) { /* 무시 */ }
-    })));
-
-  const acc = document.getElementById('deco-acc');
-  acc.replaceChildren(...Object.entries(ACC_ITEMS).map(([k, it]) =>
-    decoButton(it.emoji, it.label, petAcc === k, it.lv, () => {
-      petAcc = k;
-      try { localStorage.setItem('petAcc', k); } catch (_) { /* 무시 */ }
-    })));
+  decoRow('deco-skin', SKINS, () => petSkin, (k) => { petSkin = k; }, 'petSkin',
+    (it, k) => (k === 'none' ? '🐾 기본 스킨으로 돌아왔어요' : `${it.emoji} ${it.label} 스킨 적용!`));
+  decoRow('deco-desk', DESK_ITEMS, () => deskItem, (k) => { deskItem = k; }, 'deskItem',
+    (it) => `${it.emoji} ${it.label} 놓았어요!`);
+  decoRow('deco-acc', ACC_ITEMS, () => petAcc, (k) => { petAcc = k; }, 'petAcc',
+    (it, k) => (k === 'none' ? '액세서리를 벗었어요' : `${it.emoji} ${it.label} 착용!`));
+  decoRow('deco-deskstyle', DESK_STYLES, () => deskStyle, (k) => { deskStyle = k; }, 'deskStyle',
+    (it) => `${it.emoji} ${it.label}으로 교체!`);
+  decoRow('deco-kb', KB_ITEMS, () => kbStyle, (k) => { kbStyle = k; }, 'kbStyle',
+    (it) => `${it.emoji} ${it.label}로 교체!`);
 }
 
 document.getElementById('btn-pet').addEventListener('click', () => {
   if (openPanel(decoPanel)) renderDeco();
 });
 
+/* ---- 업적 패널 + 방문객 도감 ---- */
+const achPanel = document.getElementById('ach-panel');
+const achList = document.getElementById('ach-list');
+const dexEl = document.getElementById('visitor-dex');
+
+function fmtGoal(v, goal) {
+  return goal >= 1000
+    ? `${v.toLocaleString()}/${goal.toLocaleString()}`
+    : `${v}/${goal}`;
+}
+
+function renderAch() {
+  achList.replaceChildren(...Object.entries(ACHIEVEMENTS).map(([id, a]) => {
+    const v = Math.min(a.goal, a.val());
+    const done = achUnlocked(id) || v >= a.goal;
+    const li = document.createElement('li');
+    li.classList.toggle('done', done);
+
+    const emoji = document.createElement('span');
+    emoji.className = 'ach-emoji';
+    emoji.textContent = done ? a.emoji : '❓';
+
+    const body = document.createElement('div');
+    body.className = 'ach-body';
+    const name = document.createElement('b');
+    name.textContent = a.label;
+    const desc = document.createElement('small');
+    const rewards = rewardItems(a);
+    desc.textContent = a.desc +
+      (rewards.length ? ` → ${rewards.map((r) => `${r.emoji} ${r.label}`).join(', ')}` : '');
+    const bar = document.createElement('div');
+    bar.className = 'ach-bar';
+    const fill = document.createElement('i');
+    fill.style.width = `${Math.round((v / a.goal) * 100)}%`;
+    bar.appendChild(fill);
+    body.append(name, desc, bar);
+
+    const val = document.createElement('span');
+    val.className = 'ach-val';
+    val.textContent = done ? '✓' : fmtGoal(v, a.goal);
+
+    li.append(emoji, body, val);
+    return li;
+  }));
+
+  dexEl.replaceChildren(...Object.entries(VISITORS).map(([k, v]) => {
+    const seen = stats.visitors[k];
+    const d = document.createElement('div');
+    d.className = seen ? 'dex' : 'dex unseen';
+    d.textContent = seen ? v.emoji : '?';
+    d.title = seen ? `${v.label} · ${seen}번 만남` : '???';
+    return d;
+  }));
+}
+
+document.getElementById('btn-ach').addEventListener('click', () => {
+  if (openPanel(achPanel)) renderAch();
+});
+
 document.getElementById('btn-quit').addEventListener('click', async () => {
+  saveStats(); // 타이핑 카운트는 100타 단위로만 저장하니 마지막 자투리를 남긴다
   // 마지막 상태를 서버에 남기고 종료 (오프라인이어도 1.5초 뒤엔 그냥 종료)
   await Promise.race([pushScore(), new Promise((r) => setTimeout(r, 1500))]);
   if (window.pet) window.pet.quit();
@@ -1803,6 +2851,28 @@ updateHud();
 updateCodeRow();
 syncOnStart();
 
+// 시작할 때 한 번 — 연속 기록을 갱신하고, 이미 채운 업적이 있으면 열어 준다
+stats.bestStreak = Math.max(stats.bestStreak, currentStreak());
+saveStats();
+setTimeout(checkAchievements, 1200);
+
+if (SANDBOX) showToast(`🧪 테스트 모드 Lv.${SANDBOX_LEVEL} — 저장·업로드 꺼짐`);
+
+// 이벤트 달이면 그 달에 한 번만 알려 준다 (이미 받은 스킨이면 조용히)
+(function eventNotice() {
+  if (DEMO || SANDBOX) return;
+  const mm = dayKey(new Date()).slice(5, 7);
+  const ev = mm === '09' && !achUnlocked('eventGhost')
+    ? '🎃 이벤트! 9월에 뽀모도로 20회 완주하면 👻 유령 스킨을 받아요'
+    : mm === '11' && !achUnlocked('eventIce')
+      ? '🎄 이벤트! 11월에 뽀모도로 20회 완주하면 ❄️ 아이스 스킨을 받아요'
+      : '';
+  const key = `eventNotice-${dayKey(new Date()).slice(0, 7)}`;
+  if (!ev || localStorage.getItem(key) === '1') return;
+  try { localStorage.setItem(key, '1'); } catch (_) { /* 무시 */ }
+  setTimeout(() => showToast(ev), 6000);
+})();
+
 // 하루에 한 번, 앱을 처음 켤 때 잔디 자랑
 const bragDay = dayKey(new Date());
 if (!DEMO && localStorage.getItem('lastBragDay') !== bragDay) {
@@ -1830,6 +2900,24 @@ if (DEMO_PANEL === 'rank') {
 } else if (DEMO_PANEL === 'deco') {
   decoPanel.classList.remove('hidden');
   renderDeco();
+} else if (DEMO_PANEL === 'ach') {
+  achPanel.classList.remove('hidden');
+  renderAch();
+}
+
+// ?preview=1 로 실행하면 책상 구경 미리보기가 열린 상태로 시작 (테스트/스크린샷용)
+if (params.get('preview')) {
+  rankPanel.classList.remove('hidden');
+  toggleRankPreview({
+    nickname: '테스트', pet: 'otter', level: 26,
+    deco: { desk: 'pot', acc: 'crown', skin: 'gold', deskStyle: 'marble', kb: 'mech' },
+  });
+}
+
+// ?visitor=butterfly 로 실행하면 방문객이 바로 나타난다 (테스트/스크린샷용)
+const DEMO_VISITOR = params.get('visitor');
+if (DEMO_VISITOR && VISITORS[DEMO_VISITOR]) {
+  spawnVisitor(DEMO_VISITOR, { record: false });
 }
 
 /* ---- 창을 내용 높이에 맞추기 ----

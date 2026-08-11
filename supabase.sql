@@ -1,5 +1,6 @@
--- 리더보드 스키마 v5 — 닉네임 계정 + 동기화 코드 + 잔디밭
--- (v5에서 바뀐 것: 허용 펫에 hamster/otter 추가)
+-- 리더보드 스키마 v6 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기
+-- (v6에서 바뀐 것: deco 칼럼 — 착용 중인 꾸미기 한 벌을 저장해
+--  랭킹에서 "친구 책상 구경"을 보여 주고, 다른 PC와 꾸미기를 동기화한다)
 -- (Supabase 대시보드 > SQL Editor에서 1회 실행. 옛 버전에서 업그레이드해도,
 --  새 프로젝트에 처음 실행해도 동작한다)
 --
@@ -36,6 +37,10 @@ alter table public.leaderboard drop column if exists device_id;
 -- 앞의 기록을 덮어쓰거나, 합치는 순간 같은 시간을 두 번 세게 된다.
 alter table public.leaderboard
   add column if not exists pomo_by_device jsonb not null default '{}'::jsonb;
+
+-- v5 → v6: 착용 중인 꾸미기 { desk, acc, skin, deskStyle, kb }
+alter table public.leaderboard
+  add column if not exists deco jsonb not null default '{}'::jsonb;
 
 -- 개수로 세던 중간 버전에서 올라오는 경우: 한 개를 25분으로 환산해 옮긴다
 do $$
@@ -77,7 +82,7 @@ create policy "누구나 읽기" on public.leaderboard
 -- pomo_by_device(기기 목록)는 공개 키로 조회되면 안 되므로 권한에서 뺀다.
 -- 아래 RPC들은 security definer라 소유자 권한으로 돌아 그대로 동작한다.
 revoke all on public.leaderboard from anon, authenticated;
-grant select (nickname, level, xp, pet, updated_at)
+grant select (nickname, level, xp, pet, updated_at, deco)
   on public.leaderboard to anon, authenticated;
 
 -- 동기화 코드 해시 — 새로 만드는 건 bcrypt(솔트 자동 포함)
@@ -124,6 +129,21 @@ as $$
   ) t;
 $$;
 
+-- 꾸미기 정리 — 공개 키로 호출되므로 아는 키만, 짧은 문자열 값만 받는다
+create or replace function public.clean_deco(p_deco jsonb)
+returns jsonb
+language sql
+immutable
+as $$
+  select coalesce(jsonb_object_agg(key, value), '{}'::jsonb)
+  from jsonb_each(
+    case when jsonb_typeof(coalesce(p_deco, 'null'::jsonb)) = 'object' then p_deco else '{}'::jsonb end
+  )
+  where key in ('desk', 'acc', 'skin', 'deskStyle', 'kb')
+    and jsonb_typeof(value) = 'string'
+    and length(value #>> '{}') between 1 and 16;
+$$;
+
 -- 한 기기를 뺀 나머지 기기들의 날짜별 합
 create or replace function public.sum_pomo(p_all jsonb, p_except text)
 returns jsonb
@@ -144,14 +164,15 @@ $$;
 -- 코드가 맞으면 갱신, 레거시 행(secret_hash null)은 먼저 온 사람이 선점,
 -- 남의 닉네임이면 nickname_taken.
 --
--- p_device/p_pomo는 기본값이 있어서 잔디를 모르는 예전 버전 앱(5개 인자)도 그대로 동작한다.
+-- p_device/p_pomo/p_deco는 기본값이 있어서 예전 버전 앱(인자가 적은 호출)도 그대로 동작한다.
 -- 인자가 늘어나면 새 오버로드가 생겨 PostgREST가 헷갈리므로 옛 시그니처는 지운다.
 drop function if exists public.upsert_score(text, text, int, int, text);
 drop function if exists public.upsert_score(text, text, int, int, text, jsonb);
+drop function if exists public.upsert_score(text, text, int, int, text, text, jsonb);
 
 create or replace function public.upsert_score(
   p_nickname text, p_secret text, p_level int, p_xp int, p_pet text,
-  p_device text default null, p_pomo jsonb default null
+  p_device text default null, p_pomo jsonb default null, p_deco jsonb default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -199,8 +220,9 @@ begin
 
   if not found then
     begin
-      insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device)
-      values (v_nick, public.hash_secret(p_secret), p_level, p_xp, p_pet, v_devices)
+      insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device, deco)
+      values (v_nick, public.hash_secret(p_secret), p_level, p_xp, p_pet, v_devices,
+              public.clean_deco(p_deco))
       returning * into v_row;
     exception when unique_violation then
       return jsonb_build_object('error', 'nickname_taken');
@@ -216,6 +238,9 @@ begin
       set nickname = v_nick, secret_hash = v_hash,
           level = p_level, xp = p_xp, pet = p_pet,
           pomo_by_device = v_devices,
+          -- 꾸미기를 모르는 옛 앱이 올리면(null) 저장돼 있던 것을 지우지 않는다
+          deco = case when p_deco is null then coalesce(v_row.deco, '{}'::jsonb)
+                      else public.clean_deco(p_deco) end,
           updated_at = now()
       where lower(nickname) = lower(v_nick)
       returning * into v_row;
@@ -258,6 +283,7 @@ begin
     'level', v_row.level,
     'xp', v_row.xp,
     'pet', v_row.pet,
+    'deco', coalesce(v_row.deco, '{}'::jsonb),
     'pomo_others', public.sum_pomo(v_row.pomo_by_device, p_device),
     'updated_at', v_row.updated_at
   );
@@ -272,4 +298,5 @@ $$;
 revoke execute on function public.hash_secret(text) from public, anon, authenticated;
 revoke execute on function public.verify_secret(text, text) from public, anon, authenticated;
 revoke execute on function public.clean_pomo(jsonb) from public, anon, authenticated;
+revoke execute on function public.clean_deco(jsonb) from public, anon, authenticated;
 revoke execute on function public.sum_pomo(jsonb, text) from public, anon, authenticated;

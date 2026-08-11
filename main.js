@@ -20,7 +20,7 @@ const PET_SIZES = [
   { label: '보통', px: 6 },
   { label: '크게', px: 8 },
 ];
-const MIN_WIN_W = 294;              // 버튼 바(자리 비움까지 7개)가 잘리지 않는 최소 폭
+const MIN_WIN_W = 334;              // 버튼 바(자리 비움까지 8개)가 잘리지 않는 최소 폭
 const settings = { petPx: 8, onTop: true };
 const settingsPath = () => path.join(app.getPath('userData'), 'view.json');
 
@@ -109,6 +109,16 @@ function createWindow() {
   if (process.env.TIMER) q.push(`timer=${process.env.TIMER}`);
   if (process.env.PANEL) q.push(`panel=${process.env.PANEL}`);
   if (process.env.PET) q.push(`pet=${process.env.PET}`);
+  if (process.env.NIGHT) q.push(`night=${process.env.NIGHT}`);
+  if (process.env.VISITOR) q.push(`visitor=${process.env.VISITOR}`);
+  if (process.env.DESK) q.push(`desk=${process.env.DESK}`);
+  if (process.env.ACC) q.push(`acc=${process.env.ACC}`);
+  if (process.env.SKIN) q.push(`skin=${process.env.SKIN}`);
+  if (process.env.DESKSTYLE) q.push(`deskstyle=${process.env.DESKSTYLE}`);
+  if (process.env.KB) q.push(`kb=${process.env.KB}`);
+  if (process.env.PREVIEW) q.push(`preview=${process.env.PREVIEW}`);
+  if (process.env.LEVEL) q.push(`lv=${process.env.LEVEL}`);
+  if (process.env.ACH) q.push(`ach=${process.env.ACH}`);
   win.loadFile('index.html', { search: `?${q.join('&')}` });
 
   if (process.env.SHOT) {
