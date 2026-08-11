@@ -1940,10 +1940,8 @@ async function loadRanking() {
       if (nickname && r.nickname.toLowerCase() === nickname.toLowerCase()) {
         li.classList.add('me');
       }
-      if (DESK_PREVIEW_ENABLED) {
-        li.title = '클릭하면 책상 구경 👀';
-        li.addEventListener('click', () => toggleRankPreview(r));
-      }
+      li.title = `클릭하면 펫이 이 책상을 상상해요 💭 (경험치 ${IMAGINE_COST.toLocaleString()} 소모)`;
+      li.addEventListener('click', () => toggleRankPreview(r));
       return li;
     }));
     checkTop1(rows);
@@ -1952,51 +1950,141 @@ async function loadRanking() {
   }
 }
 
-/* ---- 친구 책상 구경 — 랭킹 줄을 클릭하면 그 사람의 펫+꾸미기를 미니 캔버스에 그린다.
- * 아직 다듬는 중이라 이번 버전에서는 잠가 둔다 — ?preview=1 로만 미리 볼 수 있고,
- * 꾸미기 서버 동기화(deco)는 멀티 PC 동기화용으로 계속 동작한다 ---- */
-const DESK_PREVIEW_ENABLED = false;
-const rankPreviewEl = document.getElementById('rank-preview');
+/* ---- 친구 책상 구경 — 랭킹 줄을 클릭하면 펫이 그 사람의 책상을 "상상"한다.
+ * 머리 위 구름 생각 풍선 안에 친구의 펫+꾸미기 장면이 그려진다.
+ * 상상력은 레벨로 자란다: Lv.35부터 조금씩, Lv.60이 되면 전부 선명하게 ---- */
+const THINK_MS = 9000;
+const IMAGINE_MIN_LV = 35;
+const IMAGINE_FULL_LV = 60;
+const IMAGINE_COST = 3000;            // 상상 한 번에 쓰는 경험치
+const IMAGINE_FREE_MS = 5 * 60000;    // 값을 치른 친구는 5분 동안 무료로 다시 본다
+const thinkEl = document.getElementById('think');
 const previewCanvas = document.getElementById('preview-canvas');
 const previewName = document.getElementById('preview-name');
 let previewNick = '';
+let thinkTimer = null;
 
-function hideRankPreview() {
-  rankPreviewEl.classList.add('hidden');
-  previewNick = '';
+/* 내 레벨만큼만 친구의 꾸미기를 상상할 수 있다 — 상상 못 하는 부분은
+ * 기본값으로 채우지 않고 구멍이 숭숭 뚫린 채로 남는다 */
+function imagineVis() {
+  const lv = game.level;
+  return {
+    acc: lv >= 42,                 // 42부터 액세서리
+    desk: lv >= 50,                // 50부터 책상 소품
+    full: lv >= IMAGINE_FULL_LV,   // 60부터 책상·키보드까지 전부
+  };
 }
 
+/* 상상이 안 나는 자리에 뚫는 구멍 — 가장자리가 지저분한 흰 얼룩(구름 속살) */
+function punchHole(cx, cy, rw, rh, seed) {
+  ctx.fillStyle = '#ffffff';
+  for (let y = Math.floor(cy - rh); y <= Math.ceil(cy + rh); y++) {
+    for (let x = Math.floor(cx - rw); x <= Math.ceil(cx + rw); x++) {
+      const d = ((x - cx) / rw) ** 2 + ((y - cy) / rh) ** 2;
+      // 좌표 해시 노이즈 — 매번 같은 자리가 뜯긴 것처럼 고정된 너덜너덜함
+      const n = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453) % 1;
+      if (d <= 0.72 || (d <= 1.15 && n > 0.45)) {
+        ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+      }
+    }
+  }
+}
+
+function hideRankPreview() {
+  thinkEl.classList.add('hidden');
+  previewNick = '';
+  clearTimeout(thinkTimer);
+}
+
+let imaginePaid = { nick: '', at: 0 };
+
 function toggleRankPreview(r) {
+  if (game.level < IMAGINE_MIN_LV) {
+    showToast(`💭 친구 책상을 상상하는 건 Lv.${IMAGINE_MIN_LV}부터 조금씩 열려요`);
+    return;
+  }
   if (previewNick === r.nickname) {
     hideRankPreview();
     return;
   }
+  // 상상은 공짜가 아니다 — 모아 둔 경험치를 태워서 떠올린다 (테스트 모드는 무료)
+  const freePass = imaginePaid.nick === r.nickname &&
+    Date.now() - imaginePaid.at < IMAGINE_FREE_MS;
+  if (!SANDBOX && !freePass) {
+    if (game.xp < IMAGINE_COST) {
+      showToast(`💭 상상하려면 경험치 ${IMAGINE_COST.toLocaleString()}이 필요해요 (지금 ${game.xp.toLocaleString()})`);
+      return;
+    }
+    game.xp -= IMAGINE_COST;
+    imaginePaid = { nick: r.nickname, at: Date.now() };
+    saveGame();
+    updateHud();
+    showToast(`💭 경험치 ${IMAGINE_COST.toLocaleString()}을 상상에 사용했어요`);
+  }
   previewNick = r.nickname;
-  renderDeskPreview(r);
-  previewName.textContent = `${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}의 책상`;
-  rankPreviewEl.classList.remove('hidden');
+  const vis = imagineVis();
+  renderDeskPreview(r, vis);
+  previewName.textContent =
+    `${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}의 책상…${vis.full ? '' : ' 군데군데 안 보인다'}`;
+  thinkEl.classList.remove('hidden');
+  clearTimeout(thinkTimer);
+  thinkTimer = setTimeout(hideRankPreview, THINK_MS);
+}
+
+/* ---- 구름 모양 — 사각 몸통 + 가장자리 원 혹들의 합집합을 픽셀로 굽는다 ---- */
+const CLOUD_W = 56;
+const CLOUD_H = 38;
+const CLOUD_BUMPS = [
+  [10, 6, 5], [20, 4, 6], [31, 5, 6], [42, 6, 5],   // 윗변 혹
+  [5, 14, 5], [5, 24, 5], [50, 14, 5], [50, 24, 5], // 옆면 혹
+  [13, 31, 4], [25, 32, 4], [38, 31, 4],            // 아랫변 혹
+];
+
+function inCloud(x, y) {
+  if (x >= 5 && x <= 50 && y >= 6 && y <= 31) return true;
+  return CLOUD_BUMPS.some(([cx, cy, r]) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r);
+}
+
+function drawCloud() {
+  for (let y = 0; y < CLOUD_H; y++) {
+    for (let x = 0; x < CLOUD_W; x++) {
+      if (!inCloud(x, y)) continue;
+      const edge = !inCloud(x - 1, y) || !inCloud(x + 1, y) ||
+        !inCloud(x, y - 1) || !inCloud(x, y + 1);
+      ctx.fillStyle = edge ? PAL.k : '#ffffff';
+      ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+    }
+  }
+  // 생각 방울 — 오른쪽 아래 펫 머리를 향해 점점 작아진다
+  ctx.fillStyle = PAL.k;
+  ctx.fillRect(44 * SCALE, 39 * SCALE, 2 * SCALE, 2 * SCALE);
+  ctx.fillRect(48 * SCALE, 43 * SCALE, 1 * SCALE, 1 * SCALE);
 }
 
 /* 그리기 헬퍼가 전부 전역 ctx/SCALE을 쓰므로, 잠깐 미니 캔버스로 바꿔
  * 정지 화면 한 장을 그리고 원래대로 되돌린다 (동기라 렌더 루프와 안 겹친다) */
-function renderDeskPreview(r) {
+function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
   const saved = { ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle };
   const d = (r.deco && typeof r.deco === 'object') ? r.deco : {};
   ctx = previewCanvas.getContext('2d');
   SCALE = 4;
   HALF = 2;
-  previewCanvas.width = SCENE_W * SCALE;
-  previewCanvas.height = SCENE_H * SCALE;
+  previewCanvas.width = CLOUD_W * SCALE;
+  previewCanvas.height = 46 * SCALE; // 구름 38칸 + 생각 방울 자리
   ctx.imageSmoothingEnabled = false;
   petKind = PET_DEFS[r.pet] ? r.pet : 'cat';
   deskItem = DESK_ITEMS[d.desk] ? d.desk : 'coffee';
-  petAcc = ACC_ITEMS[d.acc] ? d.acc : 'none';
+  petAcc = vis.acc && ACC_ITEMS[d.acc] ? d.acc : 'none';
   petSkin = SKINS[d.skin] ? d.skin : 'none';
-  deskStyle = DESK_STYLES[d.deskStyle] ? d.deskStyle : 'basic';
-  kbStyle = KB_ITEMS[d.kb] ? d.kb : 'basic';
+  deskStyle = vis.full && DESK_STYLES[d.deskStyle] ? d.deskStyle : 'basic';
+  kbStyle = vis.full && KB_ITEMS[d.kb] ? d.kb : 'basic';
   previewLevel = Math.max(1, +r.level || 1); // 화분은 그 사람 레벨만큼 자라 있다
 
   ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  drawCloud();
+  // 구름 안쪽에 장면을 그린다 — 그리기 헬퍼가 전부 셀 좌표라 translate로 밀면 된다
+  ctx.save();
+  ctx.translate(6 * SCALE, 7 * SCALE);
   drawFloorShadow();
   skinMap = petSkinMap(0);
   renderPet(EYE_OPEN, 0);
@@ -2009,7 +2097,7 @@ function renderDeskPreview(r) {
     below(0);
     skinMap = null;
   }
-  DESK_ITEMS[deskItem].draw(0);
+  if (vis.desk) DESK_ITEMS[deskItem].draw(0); // 소품을 상상 못 하면 아예 안 그린다
   drawMonitor(0, false);
   drawKeyboard(0, false);
   drawMouse(0);
@@ -2018,6 +2106,20 @@ function renderDeskPreview(r) {
   sprite(paw, PAW_L, PAW_REST);
   sprite(paw, PAW_R, PAW_REST);
   skinMap = null;
+
+  // 상상이 안 나는 자리는 구멍이 숭숭 — 레벨이 오를수록 구멍이 메워진다
+  if (!vis.desk) punchHole(5, 12, 5, 4, 1);              // 소품 자리
+  if (!vis.acc) punchHole(20, 4, 5, 2.4, 2);             // 머리(액세서리) 자리
+  if (!vis.full) {
+    punchHole(11, 17.5, 5, 1.8, 3);                      // 책상 왼쪽
+    punchHole(31, 18, 4, 1.6, 4);                        // 책상 오른쪽
+    punchHole(20, 15.5, 4.5, 1.6, 5);                    // 키보드 자리
+  }
+  if (!vis.acc && !vis.desk) {
+    punchHole(36, 9, 3, 2, 6);                           // 초반엔 더 숭숭 — 모니터
+    punchHole(15, 12, 2.5, 1.5, 7);                      //   몸통에도 하나
+  }
+  ctx.restore();
 
   ({ ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle } = saved);
   previewLevel = null;

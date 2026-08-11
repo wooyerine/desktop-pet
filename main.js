@@ -188,6 +188,12 @@ function refreshTrayMenu() {
       label: updateBusy ? '업데이트 다운로드 중…' : `v${pendingUpdate.version} 업데이트 받기`,
       enabled: !updateBusy,
       click: startUpdate,
+    }] : app.isPackaged ? [{
+      // 새 버전이 없을 때도 언제든 직접 확인할 수 있게 — 6시간(주기 확인)을
+      // 기다리지 않아도 된다. 결과는 대화상자로 알려 준다
+      label: checkingUpdate ? '업데이트 확인 중…' : '업데이트 확인',
+      enabled: !checkingUpdate,
+      click: manualUpdateCheck,
     }] : []),
     { type: 'separator' },
     {
@@ -316,10 +322,44 @@ const { pipeline } = require('stream/promises');
 const { Readable } = require('stream');
 
 const RELEASES_URL = 'https://github.com/wooyerine/desktop-pet/releases/latest';
-const UPDATE_CHECK_MS = 6 * 3600 * 1000;
+// 켜 둔 채 오래 쓰는 앱이라 확인 주기가 길면 업데이트를 영영 모른다 — 2시간마다
+const UPDATE_CHECK_MS = 2 * 3600 * 1000;
 let promptedVersion = ''; // 세션 안에서 같은 버전으로 다시 묻지 않는다
 let pendingUpdate = null; // 받을 수 있는 새 버전 정보 — 트레이 메뉴에 노출
 let updateBusy = false;   // 다운로드/교체 진행 중
+let checkingUpdate = false; // 수동 확인 진행 중 — 메뉴 연타 방지
+
+/* 트레이 메뉴의 "업데이트 확인" — 결과가 어떻든 바로 알려 준다 */
+async function manualUpdateCheck() {
+  if (checkingUpdate) return;
+  checkingUpdate = true;
+  refreshTrayMenu();
+  try {
+    const { autoUpdater } = require('electron-updater');
+    const res = await autoUpdater.checkForUpdates();
+    // 새 버전이 있으면 update-available 핸들러가 대화상자를 띄운다 —
+    // 여기서는 "이미 최신"일 때만 알려 주면 된다
+    if (!res || !pendingUpdate) {
+      dialog.showMessageBox(win, {
+        type: 'none',
+        message: '지금이 최신 버전이에요',
+        detail: `Desktop Pet v${app.getVersion()}`,
+        buttons: ['닫기'],
+      });
+    }
+  } catch (err) {
+    logUpdateError(err);
+    dialog.showMessageBox(win, {
+      type: 'none',
+      message: '업데이트 확인에 실패했어요',
+      detail: '네트워크를 확인하고 잠시 뒤 다시 시도해 주세요.',
+      buttons: ['닫기'],
+    });
+  } finally {
+    checkingUpdate = false;
+    refreshTrayMenu();
+  }
+}
 
 function logUpdateError(err) {
   try {
@@ -409,6 +449,15 @@ function setupAutoUpdate() {
   const check = () => autoUpdater.checkForUpdates().catch(logUpdateError);
   setTimeout(check, 15000); // 시작 직후는 창 띄우는 게 먼저
   setInterval(check, UPDATE_CHECK_MS);
+
+  // 잠자기 중엔 setInterval이 멈춘다 — 뚜껑만 닫았다 여는 사용 패턴에선
+  // 주기 확인이 영영 안 돌 수 있다. 깨어날 때마다 (한숨 돌리고) 확인한다
+  const { powerMonitor } = require('electron');
+  let resumeTimer = null;
+  powerMonitor.on('resume', () => {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(check, 30000); // 네트워크가 다시 붙을 시간을 준다
+  });
 }
 
 /* 자동 교체가 불가능한 상황(권한/설치 위치)이면 수동 다운로드로 안내 */
@@ -530,6 +579,13 @@ app.whenReady().then(() => {
 app.on('will-quit', () => {
   process.exit(0);
 });
+
+/* Ctrl+C(개발 실행)나 kill(SIGTERM)로 끝날 때도 마찬가지 — 시그널 기본 처리는
+ * will-quit을 거치지 않고 정리 단계로 직행해서, 훅 스레드가 죽어가는 환경에
+ * 이벤트를 쏘다 SIGABRT로 터진다. 정리 없이 바로 내린다 */
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => process.exit(0));
+}
 
 ipcMain.handle('status', () => ({ accessibilityOK, platform: process.platform }));
 

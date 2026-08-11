@@ -228,6 +228,29 @@ button:active {
 }
 .grass-legend .g { width: 9px; height: 9px; }
 
+/* ---- 생각 풍선 — 펫이 친구 책상을 상상한다 ----
+ * 구름 모양과 생각 방울은 캔버스에 픽셀로 직접 그린다 (blank 컨테이너).
+ * 왼쪽 위에 떠 있고 방울이 오른쪽 아래 펫 머리를 향한다 */
+#think {
+  -webkit-app-region: no-drag;
+  align-self: flex-start;
+  margin-left: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+#preview-canvas { image-rendering: pixelated; }
+#preview-name {
+  margin-left: 14px;
+  background: #ffffff;
+  border: 3px solid #1c1c1c;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #1c1c1c;
+}
+
 /* 말풍선 안의 최근 7일 — 잔디 7칸이 붙으니 다른 말풍선보다 폭이 더 필요하다 */
 #brag {
   --speech-left: min(
@@ -269,22 +292,6 @@ button:active {
 #rank-list li { cursor: pointer; }
 #rank-list li:hover { background: #f4f0e4; }
 #rank-list li.me { background: #ffe98a; }
-
-/* ---- 친구 책상 구경 미리보기 ---- */
-#rank-preview {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border-top: 3px solid #1c1c1c;
-  padding-top: 8px;
-}
-#preview-canvas { image-rendering: pixelated; }
-#preview-name {
-  font-size: 10px;
-  font-weight: bold;
-  color: #1c1c1c;
-}
 #nickname,
 #link-nick,
 #link-code {
