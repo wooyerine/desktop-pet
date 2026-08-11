@@ -551,6 +551,28 @@ const CLAM = [
   '..kGGGGGGGk..',
   '..kkkkkkkkk..',
 ];
+// 가끔 입을 살짝 벌리면 진주가 보인다
+const CLAM_OPEN = [
+  '....kkkkk....',
+  '..kkmmmmmkk..',
+  '.kmmmGmGmmmk.',
+  'kmmmGmmmGmmmk',
+  'kmmGmmmmmGmmk',
+  'kmmGmmmmmGmmk',
+  '.kmGmmmmmGmk.',
+  '..kmGmmmGmk..',
+  '..k..WW...k..',
+  '..kGGGGGGGk..',
+  '..kkkkkkkkk..',
+];
+
+// 해바라기씨 더미 옆에서 폴짝폴짝 튀는 씨 한 알
+const MINI_SEED = [
+  '.k.',
+  'kCk',
+  'kmk',
+  '.k.',
+];
 
 // 껍질을 반쯤 깐 군고구마 — 비스듬한 고구마, 위쪽만 노란 속
 const GOGUMA = [
@@ -654,12 +676,15 @@ const PLANT_FLOWER = [
 /* 화분 식물 단계 — 미리보기에서는 그 사람의 레벨로 그린다 */
 let previewLevel = null;
 
-/* 새싹(18) → 수풀(30) → 꽃(42). 꽃이 펴야 나비가 찾아온다 */
-function drawPot() {
+/* 새싹(18) → 수풀(30) → 꽃(42). 꽃이 펴야 나비가 찾아온다.
+ * 잎은 살랑살랑, 꽃이 피면 가끔 반짝 */
+function drawPot(now = 0) {
   const lv = previewLevel ?? game.level;
   const plant = lv >= 42 ? PLANT_FLOWER : lv >= 30 ? PLANT_BUSH : PLANT_SPROUT;
-  sprite4(plant, 5, 27 - plant.length);
+  const sway = Math.floor(now / 900) % 2;
+  sprite4(plant, 5 + sway, 27 - plant.length);
   sprite4(POT, 4, 27);
+  if (lv >= 42 && Math.floor(now / 1300) % 4 === 0) px4(9 + sway, 21, 'W');
 }
 
 // 어항 — 물고기가 좌우로 헤엄치고 공기방울이 올라온다
@@ -769,7 +794,7 @@ const FIRE_B = [
   '.kkkkkk.',
 ];
 
-// 아침 해 — 새벽 5시 세션 기념 장식
+// 아침 해 — 새벽 5시 세션 기념 장식. 광선이 번갈아 깜빡인다
 const SUN = [
   'y...y...y',
   '..kkkkk..',
@@ -778,6 +803,18 @@ const SUN = [
   '.kyyyyyk.',
   '..kkkkk..',
   'y...y...y',
+  '....k....',
+  '..kTTTk..',
+  '..kkkkk..',
+];
+const SUN_B = [
+  '....y....',
+  '..kkkkk..',
+  '.kyyyyyk.',
+  '.kyyXyyk.',
+  '.kyyyyyk.',
+  '..kkkkk..',
+  '....y....',
   '....k....',
   '..kTTTk..',
   '..kkkkk..',
@@ -843,9 +880,30 @@ const TROPHY = [
 /* ---------------- 꾸미기 아이템 목록 ----------------
  * lv 있는 것은 레벨로, ach 있는 것은 업적으로 잠금 해제 */
 const DESK_ITEMS = {
-  coffee: { label: '아이스 커피', emoji: '☕', lv: 1, draw: () => sprite4(CUP, 4, 20) },
-  seeds: { label: '해바라기씨', emoji: '🌻', lv: 3, draw: () => sprite4(SEEDS, 2, 22) },
-  clam: { label: '조개', emoji: '🐚', lv: 5, draw: () => sprite4(CLAM, 3, 22) },
+  coffee: {
+    label: '아이스 커피', emoji: '☕', lv: 1,
+    draw: (now) => {
+      sprite4(CUP, 4, 20);
+      // 유리잔 물방울 반짝 — 두 지점이 번갈아 빛난다
+      const ph = Math.floor(now / 700) % 4;
+      if (ph === 0) px4(6, 26, 'W');
+      else if (ph === 2) px4(10, 29, 'W');
+    },
+  },
+  seeds: {
+    label: '해바라기씨', emoji: '🌻', lv: 3,
+    draw: (now) => {
+      sprite4(SEEDS, 2, 22);
+      // 옆에서 폴짝폴짝 튀는 씨 한 알
+      const hop = Math.floor(now / 300) % 4 === 1 ? 1 : 0;
+      sprite4(MINI_SEED, 20, 28 - hop);
+    },
+  },
+  clam: {
+    label: '조개', emoji: '🐚', lv: 5,
+    // 가끔 입을 살짝 벌리면 진주가 빼꼼
+    draw: (now) => sprite4(Math.floor(now / 1100) % 6 === 0 ? CLAM_OPEN : CLAM, 3, 22),
+  },
   goguma: {
     label: '군고구마', emoji: '🍠', lv: 8,
     draw: (now) => {
@@ -864,19 +922,59 @@ const DESK_ITEMS = {
     draw: (now) => sprite4(Math.floor(now / 500) % 2 ? CANDLE_A : CANDLE_B, 5, 24),
     glow: drawCandleGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
   },
-  tomato: { label: '토마토', emoji: '🍅', lv: 1, ach: 'pomo100', draw: () => sprite4(TOMATO, 4, 25) },
+  tomato: {
+    label: '토마토', emoji: '🍅', lv: 1, ach: 'pomo100',
+    draw: (now) => {
+      sprite4(TOMATO, 4, 25);
+      // 반들반들 광택이 자리를 옮겨 가며 반짝
+      const ph = Math.floor(now / 800) % 4;
+      if (ph === 1) px4(9, 28, 'W');
+      else if (ph === 3) px4(7, 30, 'W');
+    },
+  },
   campfire: {
     label: '미니 모닥불', emoji: '🔥', lv: 1, ach: 'streak30',
     draw: (now) => sprite4(Math.floor(now / 180) % 2 ? FIRE_A : FIRE_B, 4, 25),
   },
-  sun: { label: '아침 해', emoji: '☀️', lv: 1, ach: 'early5', draw: () => sprite4(SUN, 4, 23) },
-  trophy: { label: '트로피', emoji: '🏆', lv: 1, ach: 'top1', draw: () => sprite4(TROPHY, 3, 24) },
+  sun: {
+    label: '아침 해', emoji: '☀️', lv: 1, ach: 'early5',
+    // 광선이 대각선 ↔ 십자로 번갈아 깜빡인다
+    draw: (now) => sprite4(Math.floor(now / 650) % 2 ? SUN_B : SUN, 4, 23),
+  },
+  trophy: {
+    label: '트로피', emoji: '🏆', lv: 1, ach: 'top1',
+    draw: (now) => {
+      sprite4(TROPHY, 3, 24);
+      // 컵을 스치는 빛 — 세 지점을 차례로 훑는다
+      const spots = [[6, 25], [8, 26], [5, 27]];
+      const s = Math.floor(now / 300) % 6;
+      if (s < 3) px4(spots[s][0], spots[s][1], 'W');
+    },
+  },
   pumpkin: {
     label: '펌킨 조명', emoji: '🎃', lv: 1, ach: 'eventGhost',
-    draw: () => sprite4(PUMPKIN, 4, 24),
+    draw: (now) => {
+      sprite4(PUMPKIN, 4, 24);
+      // 촛불이 일렁이듯 눈코입이 가끔 어두워진다
+      if (Math.floor(now / 300) % 5 === 0) {
+        for (const [x, y] of [[6, 28], [7, 28], [10, 28], [11, 28], [6, 30], [8, 30], [9, 30], [11, 30]]) {
+          px4(x, y, 'X');
+        }
+      }
+    },
     glow: drawPumpkinGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
   },
-  tree: { label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce', draw: () => sprite4(TREE, 3, 19) },
+  tree: {
+    label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce',
+    draw: (now) => {
+      sprite4(TREE, 3, 19);
+      // 전구처럼 오너먼트 두 그룹이 번갈아 켜지고 별도 반짝인다
+      const ph = Math.floor(now / 600) % 2;
+      const on = ph ? [[7, 23], [10, 28], [11, 29]] : [[8, 26], [5, 29]];
+      for (const [x, y] of on) px4(x, y, 'y');
+      if (Math.floor(now / 900) % 3 === 0) px4(8, 19, 'W');
+    },
+  },
 };
 
 /* 안경 — 눈 위치(P.eyes)에 맞춰 그려서 어느 펫이든 쓸 수 있다.
@@ -925,14 +1023,15 @@ function drawHeadset(P, dy) {
 
 /* 목도리 — 어깨선을 두 줄로 감고 오른쪽에 꼬리가 늘어진다.
  * 얼굴이 커서 턱 바로 밑에 두르면 입처럼 보인다 — 어깨까지 내린다 */
-function drawScarf(P, dy) {
+function drawScarf(P, dy, now = 0) {
   const y = PET_Y + dy + P.eyes.y + 5;
   const l = PET_X + P.acc.l + 2;
   const r = PET_X + P.acc.r - 2;
+  const sway = Math.floor(now / 900) % 2; // 꼬리가 살랑살랑
   rect(l, y, r - l + 1, 1, 'R');
   rect(l, y + 1, r - l + 1, 1, '#b23e3a');
-  rect(r - 3, y + 2, 2, 2, 'R');       // 늘어진 꼬리
-  rect(r - 3, y + 4, 2, 1, '#b23e3a'); // 술
+  rect(r - 3 - sway, y + 2, 2, 2, 'R');       // 늘어진 꼬리
+  rect(r - 3 - sway, y + 4, 2, 1, '#b23e3a'); // 술
 }
 
 /* 선글라스 — 안경과 같은 앵커, 렌즈를 까맣게 채운다 */
@@ -969,7 +1068,7 @@ function drawHat(P, dy) {
 
 /* 왕관 — 금색 밴드 + 보석 + 뾰족 3개, 고레벨의 상징.
  * 검정 테두리를 둘러야 골드 스킨 위에서도 묻히지 않는다 */
-function drawCrown(P, dy) {
+function drawCrown(P, dy, now = 0) {
   const y = PET_Y + dy + P.eyes.y - 4;
   const l = PET_X + P.eyes.lx - 1;
   const r = PET_X + P.eyes.rx + 2;
@@ -979,13 +1078,15 @@ function drawCrown(P, dy) {
   rect(r + 1, y - 1, 1, 3, 'k');      // 오른쪽 테두리
   rect(l, y + 2, w, 1, 'k');          // 밴드 아래 테두리
   rect(l, y, w, 2, 'y');
-  px(mid, y + 1, 'R');                // 가운데 보석
+  // 가운데 보석 — 은은하게 빛났다 꺼졌다
+  px(mid, y + 1, Math.floor(now / 800) % 3 ? 'R' : '#ff9db4');
   px(l, y - 1, 'y');
   px(r, y - 1, 'y');
   px(mid, y - 1, 'y');
   px(mid, y - 2, 'y');
   px(mid - 1, y - 2, 'k');            // 가운데 뾰족 테두리
   px(mid + 1, y - 2, 'k');
+  if (Math.floor(now / 800) % 5 === 0) px(r, y - 2, 'W'); // 가끔 반짝
 }
 
 const ACC_ITEMS = {
@@ -1124,7 +1225,7 @@ const PAW_MOUSE = 27;
 const PAW_REST = 13;
 const PAW_DOWN = 14;
 
-function renderPet(eye, dy) {
+function renderPet(eye, dy, now = 0) {
   const P = PET_DEFS[petKind];
   const rim = SKINS[petSkin] && SKINS[petSkin].rim;
   if (rim) spriteRim(P.sprite, PET_X - 1, PET_Y - 1 + dy, rim);
@@ -1137,7 +1238,7 @@ function renderPet(eye, dy) {
   skinMap = m;
   P.face(dy);
   const acc = ACC_ITEMS[petAcc];
-  if (acc && acc.draw) acc.draw(P, dy);
+  if (acc && acc.draw) acc.draw(P, dy, now);
 }
 
 /* ---------------- 가구/소품 ---------------- */
@@ -2300,7 +2401,7 @@ function render(now) {
   }
 
   skinMap = petSkinMap(now);
-  renderPet(eye, dy);
+  renderPet(eye, dy, now);
   skinMap = null;
   drawSkinSparkle(now, dy);
 
