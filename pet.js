@@ -1310,6 +1310,7 @@ function drawMouse(wiggle) {
 const state = {
   lastKey: 0,
   lastMouse: 0,
+  keyRing: [], // 최근 키 입력 3개의 시각 — 점수는 "진짜 타이핑 리듬"에만 준다
   pawFlip: false,
   blinkUntil: 0,
   nextBlink: performance.now() + 2500,
@@ -1785,7 +1786,9 @@ setInterval(() => {
   let delta = 0;
   if (state.nagging) delta = -2;
   else if (state.mode === 'sleeping') delta = -1;
-  else if (now - state.lastKey < 10000) delta = 1; // 최근 10초 안에 타이핑
+  // 최근 10초 안에 키 3번 이상 — 한 번 톡 누르는 걸로는 점수가 유지되지 않고,
+  // 생각하며 치는 진짜 타이핑 리듬은 끊기지 않는다
+  else if (state.keyRing.length === 3 && now - state.keyRing[0] < 10000) delta = 1;
   if (delta) {
     game.sessionXp += delta;
     addXp(delta);
@@ -2501,6 +2504,8 @@ if (window.pet) {
     const now = performance.now();
     if (type === 'key') {
       state.lastKey = now;
+      state.keyRing.push(now);
+      if (state.keyRing.length > 3) state.keyRing.shift();
       state.pawFlip = !state.pawFlip;
       // 누적 타이핑 통계 — 저장은 100타마다 한 번만
       stats.keys += 1;
