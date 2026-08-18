@@ -1,6 +1,6 @@
 {
   "name": "desktop-pet",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "픽셀 데스크탑 펫 — 같이 일하는 고양이/강아지/토끼",
   "main": "main.js",
   "scripts": {

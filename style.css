@@ -292,6 +292,13 @@ button:active {
 #rank-list li { cursor: pointer; }
 #rank-list li:hover { background: #f4f0e4; }
 #rank-list li.me { background: #ffe98a; }
+#rank-list li.rank-gap {
+  cursor: default;
+  text-align: center;
+  color: #8a8577;
+  line-height: 0.6;
+}
+#rank-list li.rank-gap:hover { background: none; }
 #nickname,
 #link-nick,
 #link-code {

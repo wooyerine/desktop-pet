@@ -2016,39 +2016,82 @@ function lvBadge(lv) {
   return lv >= 30 ? ' 💎' : lv >= 20 ? ' 🌟' : lv >= 10 ? ' ⭐' : '';
 }
 
+function rankLine(r, rank) {
+  const li = document.createElement('li');
+  li.textContent =
+    `${rank}위 ${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}${lvBadge(r.level)}` +
+    ` — Lv.${r.level} (${r.xp})`;
+  if (nickname && r.nickname.toLowerCase() === nickname.toLowerCase()) {
+    li.classList.add('me');
+  }
+  li.title = `클릭하면 펫이 이 책상을 상상해요 💭 (경험치 ${IMAGINE_COST.toLocaleString()} 소모)`;
+  li.addEventListener('click', () => toggleRankPreview(r));
+  return li;
+}
+
+// 내 등수 = 나보다 앞선 사람 수 + 1 (레벨 → 경험치 순, 동점이면 공동 순위)
+async function sbMyRank(level, xp) {
+  const filter = `or=(level.gt.${level},and(level.eq.${level},xp.gt.${xp}))`;
+  const res = await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=nickname&${filter}`, {
+    method: 'HEAD',
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      Prefer: 'count=exact',
+    },
+  });
+  if (!res.ok) throw new Error(`supabase ${res.status}`);
+  const m = /\/(\d+)\s*$/.exec(res.headers.get('content-range') || '');
+  return m ? Number(m[1]) + 1 : null;
+}
+
+// 랭킹을 다시 그리는 사이 늦게 도착한 "내 순위" 줄이 새 리스트에 붙지 않게 한다
+let rankLoadSeq = 0;
+
+/* 내가 10위 밖이어도 내 순위는 보이게 — 리스트 밑에 "⋯ / n위 나"를 붙인다 */
+async function appendMyRank(rows, cols, seq) {
+  if (!nickname) return;
+  if (rows.some((r) => r.nickname.toLowerCase() === nickname.toLowerCase())) return;
+  try {
+    const pat = nickname.replace(/[\\%_]/g, '\\$&'); // ilike 와일드카드 이스케이프
+    const mine = await sbFetch(
+      `${SB_TABLE}?select=${cols}&nickname=ilike.${encodeURIComponent(pat)}&limit=1`
+    );
+    if (!mine || !mine.length) return; // 아직 서버에 점수를 올린 적이 없다
+    const rank = await sbMyRank(mine[0].level, mine[0].xp);
+    if (rank == null || seq !== rankLoadSeq) return;
+    const gap = document.createElement('li');
+    gap.className = 'rank-gap';
+    gap.textContent = '⋯';
+    rankList.append(gap, rankLine(mine[0], rank));
+  } catch {
+    // 내 순위는 덤 — 실패해도 상위 10은 이미 떠 있다
+  }
+}
+
 async function loadRanking() {
   rankList.innerHTML = '<li>불러오는 중…</li>';
   hideRankPreview();
+  const seq = ++rankLoadSeq;
   try {
+    let cols = 'nickname,level,xp,pet,deco';
     let rows;
     try {
-      rows = await sbFetch(
-        `${SB_TABLE}?select=nickname,level,xp,pet,deco&order=level.desc,xp.desc&limit=10`
-      );
+      rows = await sbFetch(`${SB_TABLE}?select=${cols}&order=level.desc,xp.desc&limit=10`);
     } catch (err) {
       // 옛 스키마 — deco 칼럼이 없으면 빼고 다시
       if (!/40[04]/.test(`${err.message}`)) throw err;
-      rows = await sbFetch(
-        `${SB_TABLE}?select=nickname,level,xp,pet&order=level.desc,xp.desc&limit=10`
-      );
+      cols = 'nickname,level,xp,pet';
+      rows = await sbFetch(`${SB_TABLE}?select=${cols}&order=level.desc,xp.desc&limit=10`);
     }
     if (!rows || !rows.length) {
       rankList.innerHTML = '<li>아직 아무도 없어요 — 닉네임을 저장해 보세요!</li>';
       return;
     }
-    rankList.replaceChildren(...rows.map((r, i) => {
-      const li = document.createElement('li');
-      li.textContent =
-        `${i + 1}위 ${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}${lvBadge(r.level)}` +
-        ` — Lv.${r.level} (${r.xp})`;
-      if (nickname && r.nickname.toLowerCase() === nickname.toLowerCase()) {
-        li.classList.add('me');
-      }
-      li.title = `클릭하면 펫이 이 책상을 상상해요 💭 (경험치 ${IMAGINE_COST.toLocaleString()} 소모)`;
-      li.addEventListener('click', () => toggleRankPreview(r));
-      return li;
-    }));
+    if (seq !== rankLoadSeq) return;
+    rankList.replaceChildren(...rows.map((r, i) => rankLine(r, i + 1)));
     checkTop1(rows);
+    appendMyRank(rows, cols, seq);
   } catch (err) {
     rankList.innerHTML = '<li>불러오기 실패 — 네트워크나 테이블을 확인해 주세요</li>';
   }
