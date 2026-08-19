@@ -1,0 +1,19 @@
+name: 💡 기능 제안
+description: 이런 기능 있으면 좋겠다!
+title: "[제안] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: situation
+    attributes:
+      label: 어떤 상황에서 필요했나요?
+      placeholder: 예) 밤에 작업하는데 펫이 너무 밝아서 눈부셔요
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 뭐가 있으면 좋겠나요?
+      placeholder: 예) 다크 모드 / 밝기 조절이 있으면 좋겠어요
+    validations:
+      required: true

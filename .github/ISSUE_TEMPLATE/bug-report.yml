@@ -1,0 +1,29 @@
+name: 🐛 버그 신고
+description: 뭔가 이상하게 동작해요
+title: "[버그] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 무슨 일이 있었나요?
+      placeholder: 예) 타이핑해도 펫이 안 움직여요. 앱을 껐다 켜도 그대로예요
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 앱 버전
+      description: 메뉴바(트레이) 아이콘을 누르면 맨 위에 보여요 (예. v1.9.4)
+      placeholder: v1.9.4
+    validations:
+      required: true
