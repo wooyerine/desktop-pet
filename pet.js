@@ -1504,7 +1504,7 @@ function thisWeekDays() {
  *  - 일 시작 후 타이핑하면 +1/초, 잠들면 -1/초, 잔소리 뜨면 -2/초
  *  - 자리 비움 중엔 증감 없음, 일 끝 완주 보너스 / 뽀모도로 보너스
  * ================================================================ */
-const XP_PER_LEVEL = (lv) => lv * 2000; // 1000이었더니 레벨이 너무 빨리 올랐다
+const XP_PER_LEVEL = (lv) => lv * 1000; // 2000은 너무 더뎠다 — 방문객/꾸미기 해금 텀이 길어져서
 const WORK_BONUS = 50;
 const WORK_BONUS_MIN_MS = 10 * 60000; // 10분 이상 일해야 완주 보너스 (시작/끝 반복 어뷰징 방지)
 const POMODORO_BONUS = 100;
@@ -1733,12 +1733,14 @@ function checkAchievements() {
  * 방문객 — 일하는 중에 가끔 책상에 놀러 온다 (도감에 기록)
  * ================================================================ */
 const VISITORS = {
+  // 레벨이 오를수록 새 손님이 띄엄띄엄 늘어난다 (10레벨 간격) —
+  // 처음부터 다 풀어놨더니 4종은 금방 모이고 나비(42)까지만 텅 빈 구간이 생겼다.
   // 나비는 화분에 꽃이 핀 뒤(Lv.42)에야 찾아온다
   butterfly: { emoji: '🦋', label: '나비', weight: 4, dur: 18000, minLv: 42 },
-  bird: { emoji: '🐦', label: '참새', weight: 3, dur: 15000 },
+  bird: { emoji: '🐦', label: '참새', weight: 3, dur: 15000, minLv: 10 },
   ladybug: { emoji: '🐞', label: '무당벌레', weight: 3, dur: 20000 },
-  snail: { emoji: '🐌', label: '달팽이', weight: 2, dur: 28000 },
-  firefly: { emoji: '✨', label: '반딧불이', weight: 2, dur: 20000, night: true },
+  snail: { emoji: '🐌', label: '달팽이', weight: 2, dur: 28000, minLv: 20 },
+  firefly: { emoji: '✨', label: '반딧불이', weight: 2, dur: 20000, night: true, minLv: 30 },
 };
 
 const visitor = { kind: null, start: 0, until: 0 };
@@ -3049,7 +3051,10 @@ function renderAch() {
     const d = document.createElement('div');
     d.className = seen ? 'dex' : 'dex unseen';
     d.textContent = seen ? v.emoji : '?';
-    d.title = seen ? `${v.label} · ${seen}번 만남` : '???';
+    // 아직 못 만난 손님은 정체는 숨기되, 레벨이 모자라면 언제쯤 올지는 귀띔해 준다
+    const locked = v.minLv && game.level < v.minLv;
+    d.title = seen ? `${v.label} · ${seen}번 만남`
+      : locked ? `??? · Lv.${v.minLv}부터` : '???';
     return d;
   }));
 }
