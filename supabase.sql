@@ -39,8 +39,14 @@ alter table public.leaderboard
   add column if not exists pomo_by_device jsonb not null default '{}'::jsonb;
 
 -- v5 → v6: 착용 중인 꾸미기 { desk, acc, skin, deskStyle, kb }
+--   (v1.9.6+: acc는 "glasses,scarf"처럼 쉼표로 여러 개 — clean_deco 길이 제한 64로 넉넉히)
 alter table public.leaderboard
   add column if not exists deco jsonb not null default '{}'::jsonb;
+
+-- v6 → v7: 업적 통계 { pomos, keys, early, top1, bestStreak, visitors, pomoMonths, done }
+-- 기기마다 따로 세던 걸 서버에서 합친다 — 카운터는 큰 쪽, 업적/도감은 합집합
+alter table public.leaderboard
+  add column if not exists stats jsonb not null default '{}'::jsonb;
 
 -- 개수로 세던 중간 버전에서 올라오는 경우: 한 개를 25분으로 환산해 옮긴다
 do $$
@@ -141,7 +147,72 @@ as $$
   )
   where key in ('desk', 'acc', 'skin', 'deskStyle', 'kb')
     and jsonb_typeof(value) = 'string'
-    and length(value #>> '{}') between 1 and 16;
+    and length(value #>> '{}') between 1 and 64; -- acc는 "glasses,scarf"처럼 여러 개를 쉼표로 잇는다
+$$;
+
+-- 업적 통계 정리 — 아는 키만, 형식 맞는 값만
+create or replace function public.clean_stats(p jsonb)
+returns jsonb
+language sql
+immutable
+as $$
+  with src as (
+    select case when jsonb_typeof(coalesce(p, 'null'::jsonb)) = 'object' then p else '{}'::jsonb end as j
+  ),
+  num as (
+    select jsonb_object_agg(k, to_jsonb(least(greatest((j -> k #>> '{}')::numeric, 0), 100000000)::int)) as v
+    from src, unnest(array['pomos', 'keys', 'bestStreak']) k
+    where jsonb_typeof(j -> k) = 'number'
+  ),
+  bool as (
+    select jsonb_object_agg(k, to_jsonb((j -> k)::boolean)) as v
+    from src, unnest(array['early', 'top1']) k
+    where jsonb_typeof(j -> k) = 'boolean'
+  ),
+  vis as (
+    select jsonb_build_object('visitors', coalesce(jsonb_object_agg(key, to_jsonb(least(greatest((value #>> '{}')::numeric, 0), 100000)::int)), '{}'::jsonb)) as v
+    from src, jsonb_each(case when jsonb_typeof(j -> 'visitors') = 'object' then j -> 'visitors' else '{}'::jsonb end)
+    where key ~ '^[a-z]{1,16}$' and jsonb_typeof(value) = 'number'
+  ),
+  mon as (
+    select jsonb_build_object('pomoMonths', coalesce(jsonb_object_agg(key, to_jsonb(least(greatest((value #>> '{}')::numeric, 0), 100000)::int)), '{}'::jsonb)) as v
+    from src, jsonb_each(case when jsonb_typeof(j -> 'pomoMonths') = 'object' then j -> 'pomoMonths' else '{}'::jsonb end)
+    where key ~ '^\d{4}-\d{2}$' and jsonb_typeof(value) = 'number'
+  ),
+  done as (
+    select jsonb_build_object('done', coalesce(jsonb_agg(distinct e), '[]'::jsonb)) as v
+    from src, jsonb_array_elements_text(case when jsonb_typeof(j -> 'done') = 'array' then j -> 'done' else '[]'::jsonb end) e
+    where e ~ '^[A-Za-z0-9]{1,32}$'
+  )
+  select coalesce((select v from num), '{}'::jsonb) || coalesce((select v from bool), '{}'::jsonb)
+      || (select v from vis) || (select v from mon) || (select v from done);
+$$;
+
+-- 두 기기의 통계 합치기 — 카운터는 큰 쪽, 불리언은 or, 도감/월별은 키마다 큰 쪽, 업적은 합집합.
+-- (같은 뽀모를 두 PC가 각각 세지는 않으니 더하지 않고 큰 쪽을 고른다)
+create or replace function public.merge_stats(a jsonb, b jsonb)
+returns jsonb
+language sql
+immutable
+as $$
+  with sa as (select public.clean_stats(a) j), sb as (select public.clean_stats(b) j)
+  select jsonb_build_object(
+    'pomos', greatest(coalesce((sa.j ->> 'pomos')::int, 0), coalesce((sb.j ->> 'pomos')::int, 0)),
+    'keys', greatest(coalesce((sa.j ->> 'keys')::int, 0), coalesce((sb.j ->> 'keys')::int, 0)),
+    'bestStreak', greatest(coalesce((sa.j ->> 'bestStreak')::int, 0), coalesce((sb.j ->> 'bestStreak')::int, 0)),
+    'early', coalesce((sa.j ->> 'early')::boolean, false) or coalesce((sb.j ->> 'early')::boolean, false),
+    'top1', coalesce((sa.j ->> 'top1')::boolean, false) or coalesce((sb.j ->> 'top1')::boolean, false),
+    'visitors', (select coalesce(jsonb_object_agg(key, mx), '{}'::jsonb) from (
+                   select key, max((value #>> '{}')::int) mx
+                   from (select * from jsonb_each(sa.j -> 'visitors') union all select * from jsonb_each(sb.j -> 'visitors')) t
+                   group by key) g),
+    'pomoMonths', (select coalesce(jsonb_object_agg(key, mx), '{}'::jsonb) from (
+                     select key, max((value #>> '{}')::int) mx
+                     from (select * from jsonb_each(sa.j -> 'pomoMonths') union all select * from jsonb_each(sb.j -> 'pomoMonths')) t
+                     group by key) g),
+    'done', (select coalesce(jsonb_agg(distinct e), '[]'::jsonb) from (
+               select * from jsonb_array_elements_text(sa.j -> 'done') union select * from jsonb_array_elements_text(sb.j -> 'done')) u(e))
+  ) from sa, sb;
 $$;
 
 -- 한 기기를 뺀 나머지 기기들의 날짜별 합
@@ -169,10 +240,12 @@ $$;
 drop function if exists public.upsert_score(text, text, int, int, text);
 drop function if exists public.upsert_score(text, text, int, int, text, jsonb);
 drop function if exists public.upsert_score(text, text, int, int, text, text, jsonb);
+drop function if exists public.upsert_score(text, text, int, int, text, text, jsonb, jsonb);
 
 create or replace function public.upsert_score(
   p_nickname text, p_secret text, p_level int, p_xp int, p_pet text,
-  p_device text default null, p_pomo jsonb default null, p_deco jsonb default null
+  p_device text default null, p_pomo jsonb default null, p_deco jsonb default null,
+  p_stats jsonb default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -183,6 +256,7 @@ declare
   v_hash text;
   v_row public.leaderboard;
   v_devices jsonb;
+  v_stats jsonb;
 begin
   if v_nick is null or v_nick = '' or length(v_nick) > 12 then
     return jsonb_build_object('error', 'bad_nickname');
@@ -218,11 +292,15 @@ begin
     end if;
   end if;
 
+  -- 업적 통계는 늘 합친다 — 어느 PC가 최신이든 업적이 사라지면 안 된다
+  v_stats := case when p_stats is null then coalesce(v_row.stats, '{}'::jsonb)
+                  else public.merge_stats(coalesce(v_row.stats, '{}'::jsonb), p_stats) end;
+
   if not found then
     begin
-      insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device, deco)
+      insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device, deco, stats)
       values (v_nick, public.hash_secret(p_secret), p_level, p_xp, p_pet, v_devices,
-              public.clean_deco(p_deco))
+              public.clean_deco(p_deco), v_stats)
       returning * into v_row;
     exception when unique_violation then
       return jsonb_build_object('error', 'nickname_taken');
@@ -241,6 +319,7 @@ begin
           -- 꾸미기를 모르는 옛 앱이 올리면(null) 저장돼 있던 것을 지우지 않는다
           deco = case when p_deco is null then coalesce(v_row.deco, '{}'::jsonb)
                       else public.clean_deco(p_deco) end,
+          stats = v_stats,
           updated_at = now()
       where lower(nickname) = lower(v_nick)
       returning * into v_row;
@@ -250,7 +329,8 @@ begin
 
   return jsonb_build_object(
     'updated_at', v_row.updated_at,
-    'pomo_others', public.sum_pomo(v_row.pomo_by_device, p_device)
+    'pomo_others', public.sum_pomo(v_row.pomo_by_device, p_device),
+    'stats', coalesce(v_row.stats, '{}'::jsonb)
   );
 end;
 $$;
@@ -284,6 +364,7 @@ begin
     'xp', v_row.xp,
     'pet', v_row.pet,
     'deco', coalesce(v_row.deco, '{}'::jsonb),
+    'stats', coalesce(v_row.stats, '{}'::jsonb),
     'pomo_others', public.sum_pomo(v_row.pomo_by_device, p_device),
     'updated_at', v_row.updated_at
   );
@@ -300,3 +381,5 @@ revoke execute on function public.verify_secret(text, text) from public, anon, a
 revoke execute on function public.clean_pomo(jsonb) from public, anon, authenticated;
 revoke execute on function public.clean_deco(jsonb) from public, anon, authenticated;
 revoke execute on function public.sum_pomo(jsonb, text) from public, anon, authenticated;
+revoke execute on function public.clean_stats(jsonb) from public, anon, authenticated;
+revoke execute on function public.merge_stats(jsonb, jsonb) from public, anon, authenticated;

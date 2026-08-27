@@ -343,7 +343,17 @@ button:active {
 }
 
 /* ---- 꾸미기 패널 ---- */
-#deco-panel { width: 246px; } /* 펫 5종 버튼이 한 줄에 들어가는 폭 */
+#deco-panel {
+  width: 246px; /* 펫 5종 버튼이 한 줄에 들어가는 폭 */
+  max-height: 400px; /* 아이템이 늘어도 창이 화면을 넘지 않게 — 넘치면 안에서 스크롤 */
+  overflow-y: auto;
+}
+.deco-row button.more {
+  width: auto;
+  padding: 0 8px;
+  font-size: 11px;
+  background: #f1efe9;
+}
 .deco-title {
   font-size: 11px;
   font-weight: bold;

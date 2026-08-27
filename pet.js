@@ -877,6 +877,208 @@ const TROPHY = [
   '..kkkkkkk..',
 ];
 
+/* ---- 후반 레벨 소품 (Lv.38~96) ---- */
+// 곰인형 — 가끔 고개를 까딱
+const BEAR_BODY = [
+  '..kkkkkk..',
+  '.keeeeeek.',
+  'keeffffeek',
+  'keeffffeek',
+  '.keeeeeek.',
+  '..kkkkkk..',
+];
+const BEAR_HEAD = [
+  '.kk....kk.',
+  'kfek..kefk',
+  '.keeeeeek.',
+  'keeeeeeeek',
+  'keekeekeek',
+  'keeeffeeek',
+  'keeefkfeek',
+  '.keeffeek.',
+  '..kkkkkk..',
+];
+// 녹차 세트 — 받침 위 찻잔, 김 모락모락
+const TEACUP = [
+  '.kkkkkkkk.',
+  'kWAAAAAAWk',
+  'kWWWWWWWWkk',
+  'kWWWWWWWWkk',
+  '.kWWWWWWkk',
+  '..kkkkkk..',
+  'kkkkkkkkkkkk',
+  '.kLLLLLLLLk.',
+  '..kkkkkkkk..',
+];
+// 라디오 — 스피커 그릴 + 다이얼, 안테나 끝이 깜빡이고 음표가 떠오른다
+const RADIO = [
+  '.........k..',
+  '........k...',
+  '.......k....',
+  'kkkkkkkkkkkk',
+  'kBBBBBBBBBBk',
+  'kBgkgkgBBkBk',
+  'kBkgkgkByyBk',
+  'kBgkgkgBBkBk',
+  'kBBBBBBBBBBk',
+  'kkkkkkkkkkkk',
+];
+// 펭귄 인형
+const PENGUIN = [
+  '..kkkkk..',
+  '.kkkkkkk.',
+  'kkWkkkWkk',
+  'kkkkXkkkk',
+  '.kkWWWkk.',
+  'kkkWWWkkk',
+  'kkkWWWkkk',
+  'kkkWWWkkk',
+  '.kkWWWkk.',
+  '..kkkkk..',
+  '.kXX.XXk.',
+];
+// 책 더미 — 세 권이 살짝 어긋나게
+const BOOKS = [
+  '.kkkkkkkkk..',
+  '.kzzzzzWzk..',
+  '.kkkkkkkkk..',
+  'kkkkkkkkkk..',
+  'kAAAAAWAAk..',
+  'kkkkkkkkkk..',
+  '..kkkkkkkkkk',
+  '..kRRRRRRWRk',
+  '..kkkkkkkkkk',
+];
+// 레트로 게임기 — 화면이 깜빡인다
+const CONSOLE = [
+  '.kkkkkkkkkk.',
+  'kGGGGGGGGGGk',
+  'kGkkkkkkkkGk',
+  'kGkvvvvvvkGk',
+  'kGkvvvvvvkGk',
+  'kGkvvvvvvkGk',
+  'kGkkkkkkkkGk',
+  'kGkkGGGGRRGk',
+  'kGkkkGGGRRGk',
+  'kGGGGGGGGGGk',
+  '.kkkkkkkkkk.',
+];
+// 미니 기타 — 벽에 기대 세워 둔 모양
+const GUITAR = [
+  '..kkk..',
+  '..kyk..',
+  '..kBk..',
+  '..kBk..',
+  '..kBk..',
+  '..kBk..',
+  '.kkBkk.',
+  'keeBeek',
+  'keeBeek',
+  'kekkkek',
+  'keeeeek',
+  '.kkkkk.',
+];
+// 도넛 접시 — 가끔 한 입 사라진다
+const DONUT = [
+  '...kkkkkk...',
+  '..kppppppk..',
+  '.kpypkkpypk.',
+  '.kppkLLkppk.',
+  '.kppkLLkppk.',
+  '.kpypkkpypk.',
+  '..kLLLLLLk..',
+  'kkkkkkkkkkkk',
+  'kWWWWWWWWWWk',
+  '.kkkkkkkkkk.',
+];
+const DONUT_BITE = [
+  '...kkkkkk...',
+  '..kppppppk..',
+  '.kpypkkpypk.',
+  '.kppkLLkppk.',
+  '.kppkLLkpk..',
+  '.kpypkkpk...',
+  '..kLLLLk....',
+  'kkkkkkkkkkkk',
+  'kWWWWWWWWWWk',
+  '.kkkkkkkkkk.',
+];
+// 수정구슬 — 밤에 보랏빛으로 빛난다
+const CRYSTAL = [
+  '...kkkk...',
+  '..kzzzzk..',
+  '.kzWWzzzk.',
+  'kzWzzzzzzk',
+  'kzzzzzzszk',
+  'kzzzzzsszk',
+  '.kzzzzzzk.',
+  '..kzzzzk..',
+  '.kkkkkkkk.',
+  'kBBBBBBBBk',
+  '.kkkkkkkk.',
+];
+// 괘종시계 — 바늘은 실제 시각, 추가 좌우로 흔들린다
+const CLOCK = [
+  '.kkkkkkkk.',
+  'kBBBBBBBBk',
+  'kBkkkkkkBk',
+  'kBkWWWWkBk',
+  'kBkWWWWkBk',
+  'kBkWWWWkBk',
+  'kBkWWWWkBk',
+  'kBkkkkkkBk',
+  'kBBBBBBBBk',
+  'kBBBBBBBBk',
+  'kBBBBBBBBk',
+  'kBBBBBBBBk',
+  'kkkkkkkkkk',
+];
+// 벚꽃 화병 — 봄 이벤트. 꽃잎이 하나씩 떨어진다
+const VASE = [
+  '..kkkk..',
+  '.kVVVVk.',
+  '..kVVk..',
+  '.kVVVVk.',
+  'kVVWVVVk',
+  'kVVWVVVk',
+  'kVVVVVVk',
+  '.kVVVVk.',
+  '..kkkk..',
+];
+const BLOSSOM = [
+  '.pWp.',
+  'pWWWp',
+  '.pWp.',
+];
+
+function drawCrystalGlow(now, night) {
+  const cx = 8 * HALF;
+  const cy = 24 * HALF;
+  const r = (night ? 13 : 8) * HALF;
+  const a = (night ? 0.30 : 0.10) + 0.05 * Math.sin(now / 500);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, `rgba(190,150,255,${a.toFixed(3)})`);
+  g.addColorStop(1, 'rgba(190,150,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+}
+
+function drawClock(now) {
+  sprite4(CLOCK, 3, 19);
+  // 바늘 — 중심(7.5, 23.5)에서 시/분 방향으로 한두 칸
+  const d = new Date();
+  const ang = (deg) => [Math.round(Math.sin(deg) * 1.5), -Math.round(Math.cos(deg) * 1.5)];
+  const [hx, hy] = ang(((d.getHours() % 12) + d.getMinutes() / 60) / 12 * Math.PI * 2);
+  const [mx, my] = ang(d.getMinutes() / 60 * Math.PI * 2);
+  px4(7 + hx, 23 + hy, 'k');
+  px4(7 + mx * 1, 23 + my * 1, 'k');
+  px4(7, 23, 'k');
+  // 추 — 케이스 아래쪽에서 좌우로
+  const sw = Math.floor(now / 500) % 2 ? 1 : -1;
+  px4(7 + sw, 28, 'y');
+  px4(7 + sw, 29, 'y');
+}
+
 /* ---------------- 꾸미기 아이템 목록 ----------------
  * lv 있는 것은 레벨로, ach 있는 것은 업적으로 잠금 해제 */
 const DESK_ITEMS = {
@@ -922,6 +1124,69 @@ const DESK_ITEMS = {
     draw: (now) => sprite4(Math.floor(now / 500) % 2 ? CANDLE_A : CANDLE_B, 5, 24),
     glow: drawCandleGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
   },
+  bear: {
+    label: '곰인형', emoji: '🧸', lv: 38,
+    draw: (now) => {
+      sprite4(BEAR_BODY, 3, 26);
+      sprite4(BEAR_HEAD, 3 + (Math.floor(now / 1400) % 5 === 0 ? 1 : 0), 18);
+    },
+  },
+  tea: {
+    label: '녹차 세트', emoji: '🍵', lv: 48,
+    draw: (now) => {
+      sprite4(TEACUP, 3, 23);
+      sprite4(Math.floor(now / 500) % 2 ? STEAM_A : STEAM_B, 5, 18);
+    },
+  },
+  radio: {
+    label: '라디오', emoji: '📻', lv: 57,
+    draw: (now) => {
+      sprite4(RADIO, 3, 22);
+      const ph = Math.floor(now / 450) % 4;
+      if (ph === 0) px4(12, 21, 'R'); // 안테나 끝 램프
+      if (ph >= 2) sprite4(['z.', '.z', 'zz'], 15, 20 - ph); // 음표 두둥실
+    },
+  },
+  books: {
+    label: '책 더미', emoji: '📚', lv: 62,
+    draw: () => sprite4(BOOKS, 3, 23),
+  },
+  penguin: {
+    label: '펭귄 인형', emoji: '🐧', lv: 67,
+    draw: (now) => sprite4(PENGUIN, 4 + (Math.floor(now / 700) % 4 === 0 ? 1 : 0), 21),
+  },
+  console: {
+    label: '레트로 게임기', emoji: '🕹️', lv: 72,
+    draw: (now) => {
+      sprite4(CONSOLE, 3, 21);
+      // 화면 속 픽셀 캐릭터가 왔다 갔다
+      const ph = Math.floor(now / 350) % 6;
+      px4(6 + ph, 25, 'A');
+      px4(6 + ((ph + 3) % 6), 24, 'X');
+    },
+  },
+  guitar: {
+    label: '미니 기타', emoji: '🎸', lv: 79,
+    draw: (now) => {
+      sprite4(GUITAR, 4, 20);
+      if (Math.floor(now / 900) % 3 === 0) px4(6 + (Math.floor(now / 300) % 2), 26, 'g'); // 줄 울림
+    },
+  },
+  donut: {
+    label: '도넛 접시', emoji: '🍩', lv: 84,
+    draw: (now) => sprite4(Math.floor(now / 1200) % 5 === 4 ? DONUT_BITE : DONUT, 3, 22),
+  },
+  crystal: {
+    label: '수정구슬', emoji: '🔮', lv: 92,
+    draw: (now) => {
+      sprite4(CRYSTAL, 3, 21);
+      const ph = Math.floor(now / 400) % 5;
+      if (ph === 1) px4(9, 23, 'W');
+      else if (ph === 3) px4(6, 26, 'W');
+    },
+    glow: drawCrystalGlow,
+  },
+  clock: { label: '괘종시계', emoji: '🕰️', lv: 96, draw: drawClock },
   tomato: {
     label: '토마토', emoji: '🍅', lv: 1, ach: 'pomo100',
     draw: (now) => {
@@ -952,7 +1217,7 @@ const DESK_ITEMS = {
     },
   },
   pumpkin: {
-    label: '펌킨 조명', emoji: '🎃', lv: 1, ach: 'eventGhost',
+    label: '펌킨 조명', emoji: '🎃', lv: 1, ach: 'eventGhost', season: ['09', '10'],
     draw: (now) => {
       sprite4(PUMPKIN, 4, 24);
       // 촛불이 일렁이듯 눈코입이 가끔 어두워진다
@@ -964,8 +1229,24 @@ const DESK_ITEMS = {
     },
     glow: drawPumpkinGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
   },
+  vase: {
+    label: '벚꽃 화병', emoji: '🌸', lv: 1, ach: 'eventBlossom', season: ['04', '05'],
+    draw: (now) => {
+      sprite4(VASE, 4, 23);
+      // 가지 세 갈래
+      rect4(7, 20, 1, 3, 'B'); px4(6, 19, 'B'); px4(5, 18, 'B');
+      px4(8, 19, 'B'); px4(9, 18, 'B'); px4(10, 17, 'B');
+      rect4(7, 17, 1, 3, 'B');
+      sprite4(BLOSSOM, 2, 16);
+      sprite4(BLOSSOM, 9, 15);
+      sprite4(BLOSSOM, 5, 14);
+      // 꽃잎 하나가 팔랑팔랑 떨어진다
+      const t = Math.floor(now / 260) % 10;
+      px4(11 + (t % 2), 20 + t, 'p');
+    },
+  },
   tree: {
-    label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce',
+    label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce', season: ['11', '12'],
     draw: (now) => {
       sprite4(TREE, 3, 19);
       // 전구처럼 오너먼트 두 그룹이 번갈아 켜지고 별도 반짝인다
@@ -1089,15 +1370,173 @@ function drawCrown(P, dy, now = 0) {
   if (Math.floor(now / 800) % 5 === 0) px(r, y - 2, 'W'); // 가끔 반짝
 }
 
+/* ---- 후반 레벨 액세서리 (Lv.40~100) ---- */
+// 캔버스 위를 넘는 부분은 잘라 그린다 — 눌러쓰면 눈을 가린다 (강아지는 머리 위 여백이 0)
+function rectTop(x, y, w, h, color) {
+  const y0 = Math.max(0, y);
+  const hh = h - (y0 - y);
+  if (hh > 0) rect(x, y0, w, hh, color);
+}
+// 리본 — 오른쪽 귀 옆에 분홍 리본
+function drawRibbon(P, dy) {
+  const y = Math.max(1, PET_Y + dy + P.eyes.y - 4);
+  const x = PET_X + P.eyes.rx + 2;              // 매듭 위치
+  rect(x - 4, y - 1, 3, 3, 'k'); rect(x + 2, y - 1, 3, 3, 'k');   // 테두리
+  rect(x - 3, y, 2, 1, 'p'); rect(x + 2, y, 2, 1, 'p');           // 두 고리
+  px(x - 3, y - 1, 'p'); px(x + 3, y - 1, 'p');
+  rect(x - 1, y - 1, 3, 3, 'k'); px(x, y, 'R');                   // 매듭
+  px(x - 4, y + 2, 'p'); px(x + 4, y + 2, 'p');                   // 늘어진 꼬리
+}
+// 실크햇 — 높은 검정 크라운 + 빨간 띠
+function drawTopHat(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const l = PET_X + P.eyes.lx - 1;
+  const w = P.eyes.rx - P.eyes.lx + 4;
+  rectTop(l, y - 7, w, 4, 'k');
+  rect(l, y - 4, w, 1, 'R');
+  rect(l - 2, y - 3, w + 4, 1, 'k');
+  rectTop(l + 1, y - 6, 1, 1, 'G');     // 광택
+}
+// 방울 목걸이 — 빨간 목줄에 금색 방울, 타이핑하면 살랑
+function drawBell(P, dy, now = 0) {
+  const y = PET_Y + dy + P.eyes.y + 5;
+  const l = PET_X + P.acc.l + 2;
+  const r = PET_X + P.acc.r - 2;
+  const mid = l + ((r - l) >> 1);
+  const sw = Math.floor(now / 700) % 2;
+  rect(l, y, r - l + 1, 1, 'R');
+  rect(mid - 1 + sw, y + 1, 2, 2, 'y');
+  px(mid + sw, y + 2, 'k');
+}
+// 모노클 — 오른쪽 눈에만 테, 줄이 늘어진다
+function drawMonocle(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const ex = PET_X + P.eyes.rx;
+  rect(ex - 1, y - 1, 4, 1, 'y'); rect(ex - 1, y + 2, 4, 1, 'y');
+  rect(ex - 1, y, 1, 2, 'y'); rect(ex + 2, y, 1, 2, 'y');
+  px(ex + 3, y + 3, 'y'); px(ex + 3, y + 4, 'y'); px(ex + 4, y + 5, 'y');
+}
+// 밀짚모자 — 넓은 챙 + 빨간 띠
+function drawStrawHat(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const l = PET_X + P.eyes.lx - 2;
+  const w = P.eyes.rx - P.eyes.lx + 6;
+  const straw = '#e9d27a';
+  rectTop(l + 1, y - 6, w - 2, 1, 'k');
+  rectTop(l + 1, y - 5, w - 2, 1, straw);
+  rect(l + 1, y - 4, w - 2, 1, 'R');
+  rect(l - 2, y - 3, w + 4, 1, straw);
+  rect(l - 2, y - 2, w + 4, 1, 'k');
+  px(l - 3, y - 3, 'k'); px(l + w + 2, y - 3, 'k');
+}
+// 클로버 핀 — 왼쪽 가슴에 네잎
+function drawClover(P, dy) {
+  const y = PET_Y + dy + P.eyes.y + 5;
+  const x = PET_X + P.eyes.lx;
+  px(x, y, 'A'); px(x + 2, y, 'A'); px(x, y + 2, 'A'); px(x + 2, y + 2, 'A');
+  px(x + 1, y + 1, 'F'); px(x + 1, y, 'F'); px(x + 1, y + 2, 'F'); px(x, y + 1, 'F'); px(x + 2, y + 1, 'F');
+}
+// 고글 — 하늘색 렌즈 + 머리 뒤로 도는 검정 밴드
+function drawGoggles(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  rect(PET_X + P.acc.l, y, P.acc.r - P.acc.l + 1, 1, 'k'); // 밴드
+  for (const ex of [PET_X + P.eyes.lx, PET_X + P.eyes.rx]) {
+    rect(ex - 1, y - 1, 4, 4, 'k');
+    rect(ex, y, 2, 2, 'V');
+    px(ex, y, 'W');
+  }
+  rect(PET_X + P.eyes.lx + 3, y, P.eyes.rx - P.eyes.lx - 4, 1, 'k');
+}
+// 유니콘 뿔 — 정수리 가운데, 분홍 줄무늬
+function drawHorn(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const mid = PET_X + ((P.eyes.lx + P.eyes.rx) >> 1) + 1;
+  rectTop(mid, y - 7, 1, 1, 'k');
+  rectTop(mid - 1, y - 6, 3, 1, 'k'); rectTop(mid, y - 6, 1, 1, 'W');
+  rectTop(mid - 2, y - 5, 5, 1, 'k'); rectTop(mid - 1, y - 5, 3, 1, 'p');
+  rect(mid - 2, y - 4, 5, 1, 'k'); rect(mid - 1, y - 4, 3, 1, 'W');
+  rect(mid - 2, y - 3, 5, 1, 'k');
+}
+// 거꾸로 쓴 캡 — 파란 크라운, 챙은 뒤(오른쪽)로
+function drawCap(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const l = PET_X + P.eyes.lx - 2;
+  const w = P.eyes.rx - P.eyes.lx + 6;
+  const blue = '#3b6fd6';
+  rectTop(l + 1, y - 5, w - 2, 1, 'k');
+  rectTop(l, y - 4, w, 2, blue);
+  rectTop(l - 1, y - 4, 1, 1, 'k'); rectTop(l + w, y - 4, 1, 1, 'k');
+  rect(l, y - 2, w, 1, 'k');
+  rect(l + w, y - 3, 3, 1, blue);      // 뒤로 나간 챙
+  rect(l + w, y - 2, 3, 1, 'k');
+  px(l + w + 3, y - 3, 'k');
+  rectTop(l + (w >> 1), y - 6, 1, 1, 'k');        // 꼭지 단추
+}
+// 가면 — 보라 아이마스크, 눈 구멍은 뚫려 있다
+function drawMask(P, dy) {
+  const y = PET_Y + dy + P.eyes.y;
+  const l = PET_X + P.eyes.lx - 2;
+  const r = PET_X + P.eyes.rx + 3;
+  const purple = '#6a3fa0';
+  rect(l, y - 1, r - l + 1, 1, purple);
+  rect(l, y + 2, r - l + 1, 1, purple);
+  rect(l, y, 1, 2, purple); rect(r, y, 1, 2, purple);
+  rect(PET_X + P.eyes.lx + 2, y, P.eyes.rx - P.eyes.lx - 2, 2, purple); // 콧등 쪽
+  rect(l - 1, y - 2, 2, 1, purple); rect(r, y - 2, 2, 1, purple);      // 위로 뻗은 귀퉁이
+  px(l - 2, y - 3, 'y'); px(r + 2, y - 3, 'y');
+}
+// 천사 링 — 머리 위에 떠서 위아래로 둥실
+function drawHalo(P, dy, now = 0) {
+  const y = PET_Y + dy + P.eyes.y;
+  const l = PET_X + P.eyes.lx;
+  const w = P.eyes.rx - P.eyes.lx + 2;
+  const bob = Math.floor(now / 600) % 2;
+  const yy = Math.max(0, y - 7 + bob);
+  rect(l, yy, w, 1, 'y');
+  px(l - 1, yy, '#e9b949'); px(l + w, yy, '#e9b949');
+  if (Math.floor(now / 800) % 3 === 0) px(l + (w >> 1), yy, 'W');
+}
+
+/* 액세서리 — 슬롯(eyes/head/neck)이 다르면 겹쳐 입을 수 있다: 안경+목도리,
+ * 선글라스+헤드셋 등. 같은 슬롯끼리는 자리가 겹쳐서 하나만 (모자 위에 왕관은 무리) */
 const ACC_ITEMS = {
   none: { label: '없음', emoji: '✕', lv: 1, draw: null },
-  glasses: { label: '안경', emoji: '👓', lv: 6, draw: drawGlasses },
-  headset: { label: '헤드셋', emoji: '🎧', lv: 10, draw: drawHeadset },
-  scarf: { label: '목도리', emoji: '🧣', lv: 13, draw: drawScarf },
-  sunglasses: { label: '선글라스', emoji: '🕶️', lv: 16, draw: drawSunglasses },
-  hat: { label: '산타 모자', emoji: '🎅', lv: 18, draw: drawHat },
-  crown: { label: '왕관', emoji: '👑', lv: 20, draw: drawCrown },
+  glasses: { label: '안경', emoji: '👓', lv: 6, slot: 'eyes', draw: drawGlasses },
+  headset: { label: '헤드셋', emoji: '🎧', lv: 10, slot: 'head', draw: drawHeadset },
+  scarf: { label: '목도리', emoji: '🧣', lv: 13, slot: 'neck', draw: drawScarf },
+  sunglasses: { label: '선글라스', emoji: '🕶️', lv: 16, slot: 'eyes', draw: drawSunglasses },
+  hat: { label: '산타 모자', emoji: '🎅', lv: 18, slot: 'head', draw: drawHat },
+  crown: { label: '왕관', emoji: '👑', lv: 20, slot: 'head', draw: drawCrown },
+  ribbon: { label: '리본', emoji: '🎀', lv: 40, slot: 'head', draw: drawRibbon },
+  tophat: { label: '실크햇', emoji: '🎩', lv: 51, slot: 'head', draw: drawTopHat },
+  bell: { label: '방울 목걸이', emoji: '🔔', lv: 59, slot: 'neck', draw: drawBell },
+  monocle: { label: '모노클', emoji: '🧐', lv: 69, slot: 'eyes', draw: drawMonocle },
+  strawhat: { label: '밀짚모자', emoji: '👒', lv: 76, slot: 'head', draw: drawStrawHat },
+  clover: { label: '클로버 핀', emoji: '🍀', lv: 77, slot: 'neck', draw: drawClover },
+  goggles: { label: '고글', emoji: '🥽', lv: 82, slot: 'eyes', draw: drawGoggles },
+  horn: { label: '유니콘 뿔', emoji: '🦄', lv: 88, slot: 'head', draw: drawHorn },
+  cap: { label: '거꾸로 쓴 캡', emoji: '🧢', lv: 94, slot: 'head', draw: drawCap },
+  mask: { label: '가면', emoji: '🎭', lv: 98, slot: 'eyes', draw: drawMask },
+  halo: { label: '천사 링', emoji: '👼', lv: 100, slot: 'head', draw: drawHalo },
 };
+
+/* "glasses,scarf" 같은 문자열 → 유효한 키 배열 (슬롯당 하나, 뒤에 온 게 이긴다).
+ * 저장/서버 전송은 항상 이 문자열 형태 — 예전 버전의 한 개짜리 값도 그대로 읽힌다 */
+function parseAccs(str) {
+  const bySlot = {};
+  for (const k of String(str || '').split(',')) {
+    const it = ACC_ITEMS[k];
+    if (!it || !it.slot) continue;
+    bySlot[it.slot] = k;
+  }
+  // 그리는 순서는 ACC_ITEMS 정의 순서로 고정 (목도리 → 머리 → 눈이 섞이지 않게)
+  const set = new Set(Object.values(bySlot));
+  return Object.keys(ACC_ITEMS).filter((k) => set.has(k));
+}
+const accsKey = (arr) => (arr.length ? arr.join(',') : 'none');
+/* 겹쳐 입기 자체가 레벨 보상 — 이 레벨 전엔 한 번에 하나만 */
+const ACC_STACK_LV = 33;
+const canStackAcc = () => game.level >= ACC_STACK_LV;
 
 /* ---------------- 스킨 (팔레트 교체) ----------------
  * 실루엣은 그대로 두고 몸통 색만 갈아 끼운다. 홀로그램은 매 프레임
@@ -1135,9 +1574,27 @@ const SKINS = {
     sparkle: '#b9a7e8', // 보라 광택 글린트
     rim: '#a89ec4',     // 림 라이트 — 어두운 바탕화면에서도 실루엣이 살아 있게
   },
-  // ---- 계절 이벤트 스킨 — 레벨이 아니라 이벤트 업적으로 해제 ----
+  hologram: {
+    label: '홀로그램', emoji: '🌈', lv: 70,
+    // 매 프레임 색상환을 돈다 — colorsAt이 있으면 colors 대신 쓴다
+    colors: { base: '#c8a0ff', shade: '#9a70e0', light: '#ecdcff' },
+    colorsAt: (now) => {
+      const h = Math.floor(now / 30) % 360;
+      return { base: `hsl(${h},75%,70%)`, shade: `hsl(${h},70%,52%)`, light: `hsl(${h},80%,88%)` };
+    },
+    sparkle: '#ffffff',
+  },
+  galaxy: {
+    label: '은하수', emoji: '🌌', lv: 90,
+    colors: { base: '#2b2f6b', shade: '#1b1d45', light: '#5a62b8' },
+    eye: '#e6e2ff',
+    sparkle: '#ffffff',
+    rim: '#7f88d8',
+  },
+  // ---- 계절 이벤트 스킨 — 레벨이 아니라 이벤트 업적으로 해제.
+  // season의 달에만 입을 수 있다 — 철 지나면 자동으로 벗고, 다음 해에 미션 없이 다시 입는다 ----
   ghost: {
-    label: '유령', emoji: '👻', lv: 1, ach: 'eventGhost',
+    label: '유령', emoji: '👻', lv: 1, ach: 'eventGhost', season: ['09', '10'],
     // 반투명 — 뒤의 바탕화면이 비쳐 보인다
     colors: {
       base: 'rgba(235,238,250,0.55)',
@@ -1146,17 +1603,23 @@ const SKINS = {
     },
   },
   ice: {
-    label: '아이스', emoji: '❄️', lv: 1, ach: 'eventIce',
+    label: '아이스', emoji: '❄️', lv: 1, ach: 'eventIce', season: ['11', '12'],
     colors: { base: '#cfe8f2', shade: '#8fc3d9', light: '#f0fafd' },
+    sparkle: '#ffffff',
+  },
+  blossom: {
+    label: '벚꽃', emoji: '🌸', lv: 1, ach: 'eventBlossom', season: ['04', '05'],
+    colors: { base: '#f9d3dc', shade: '#e8a4b6', light: '#fff0f4' },
+    perPet: { rabbit: { base: '#fbe3ea', shade: '#e8a4b6' } },
     sparkle: '#ffffff',
   },
 };
 
-function petSkinMap() {
+function petSkinMap(now = 0) {
   const sk = SKINS[petSkin];
   if (!sk || !sk.colors) return null;
   const ch = PET_BODY_CHARS[petKind];
-  const c = (sk.perPet && sk.perPet[petKind]) || sk.colors;
+  const c = (sk.perPet && sk.perPet[petKind]) || (sk.colorsAt ? sk.colorsAt(now) : sk.colors);
   const m = { [ch.base]: c.base, [ch.shade]: c.shade };
   if (ch.light) m[ch.light] = c.light;
   if (sk.eye) m.__eye = sk.eye; // renderPet이 눈 스프라이트에만 적용
@@ -1188,12 +1651,31 @@ const DESK_STYLES = {
     label: '대리석 책상', emoji: '🏛️', lv: 25,
     top: '#e8e6ef', stripe: '#cbc8da', leg: '#b9b6c8', vein: '#aaa7bd',
   },
+  bamboo: {
+    label: '대나무 책상', emoji: '🎋', lv: 45,
+    top: '#cdb96b', stripe: '#a8934a', leg: '#8c7a3a', knots: '#7a6a30',
+  },
+  glass: {
+    label: '블랙 유리 책상', emoji: '🖤', lv: 65,
+    top: '#2a2a33', stripe: '#3b3b48', leg: '#1e1e26', shine: '#6c6c7a',
+  },
+  cloud: {
+    label: '구름 책상', emoji: '☁️', lv: 80,
+    top: '#ffffff', stripe: '#dfe9f5', leg: null, puffs: '#eef4fb', // 다리 대신 구름 뭉치
+  },
+  gold: {
+    label: '황금 책상', emoji: '🏆', lv: 100,
+    top: '#f2c14e', stripe: '#ffedb3', leg: '#c07f1c', glint: '#fff7d6',
+  },
 };
 
 /* ---------------- 키보드 스타일 ---------------- */
 const KB_ITEMS = {
   basic: { label: '기본 키보드', emoji: '⌨️', lv: 1 },
   mech: { label: '기계식 키보드', emoji: '🎹', lv: 22 },
+  rgb: { label: 'RGB 키보드', emoji: '🌈', lv: 53 },        // 타이핑하면 무지개가 흐른다
+  typewriter: { label: '타자기', emoji: '📜', lv: 74 },     // 줄 끝에서 종이가 한 칸 올라간다
+  crystal: { label: '크리스탈 키보드', emoji: '💎', lv: 86 }, // 반투명 키캡이 반짝
 };
 
 // 화면 속 클로드 (절반 픽셀, 화면 위라 테두리 없이 플랫하게)
@@ -1237,8 +1719,7 @@ function renderPet(eye, dy, now = 0) {
   sprite(eye, PET_X + P.eyes.rx, PET_Y + dy + P.eyes.y);
   skinMap = m;
   P.face(dy);
-  const acc = ACC_ITEMS[petAcc];
-  if (acc && acc.draw) acc.draw(P, dy, now);
+  for (const k of petAcc) ACC_ITEMS[k].draw(P, dy, now);
 }
 
 /* ---------------- 가구/소품 ---------------- */
@@ -1246,7 +1727,7 @@ function drawFloorShadow() {
   rect(2, 23, 40, 1, 'rgba(30,22,17,0.18)');
 }
 
-function drawDesk() {
+function drawDesk(now = 0) {
   const st = DESK_STYLES[deskStyle] || DESK_STYLES.basic;
   rect(1, DESK_Y, 42, 1, 'k');
   rect(1, DESK_Y + 1, 42, 1, st.top);
@@ -1259,13 +1740,31 @@ function drawDesk() {
     for (const vx of [6, 14, 23, 31, 38]) px(vx, DESK_Y + 1, st.vein);
     for (const vx of [10, 27, 35]) px(vx, DESK_Y + 2, st.vein);
   }
+  // 대나무 마디
+  if (st.knots) for (const vx of [5, 12, 19, 26, 33, 40]) rect(vx, DESK_Y + 1, 1, 2, st.knots);
+  // 유리 반사광 한 줄
+  if (st.shine) rect(4, DESK_Y + 1, 9, 1, st.shine);
+  // 황금 반짝
+  if (st.glint) {
+    const ph = Math.floor(now / 500) % 6;
+    if (ph < 3) px(8 + ph * 12, DESK_Y + 1, st.glint);
+  }
   // 다리
-  rect(2, 20, 1, 3, 'k');
-  rect(3, 20, 2, 3, st.leg);
-  rect(5, 20, 1, 3, 'k');
-  rect(38, 20, 1, 3, 'k');
-  rect(39, 20, 2, 3, st.leg);
-  rect(41, 20, 1, 3, 'k');
+  if (st.leg) {
+    rect(2, 20, 1, 3, 'k');
+    rect(3, 20, 2, 3, st.leg);
+    rect(5, 20, 1, 3, 'k');
+    rect(38, 20, 1, 3, 'k');
+    rect(39, 20, 2, 3, st.leg);
+    rect(41, 20, 1, 3, 'k');
+  } else if (st.puffs) {
+    // 구름 뭉치 — 살짝 떠 있는 느낌으로 좌우 번갈아 부풀린다
+    const b = Math.floor(now / 800) % 2;
+    for (const cx of [3, 9, 20, 32, 39]) {
+      rect(cx - 1 + (cx % 2 === b ? 1 : 0), 20, 3, 1, 'k');
+      rect(cx - 1 + (cx % 2 === b ? 1 : 0), 21, 3, 1, st.puffs);
+    }
+  }
 }
 
 function drawMonitor(now, typing) {
@@ -1282,21 +1781,35 @@ function drawMonitor(now, typing) {
 // 기계식 키보드의 파스텔 키캡 색 (열마다 순환)
 const MECH_CAPS = ['#e8c8f0', '#a7e0b8', '#a9c1dd', '#f7c948', '#e79aa8'];
 
+const KB_BASE = { basic: 'g', mech: '#2f2b38', rgb: '#1c1c24', typewriter: '#4a4a52', crystal: '#cfe8f2' };
+
 function drawKeyboard(now, typing) {
-  const mech = kbStyle === 'mech';
+  const style = KB_ITEMS[kbStyle] ? kbStyle : 'basic';
+  const clicky = style !== 'basic';
+  // 타자기는 위에 종이가 꽂혀 있다 — 타이핑 중엔 글자가 한 칸씩 찍힌다
+  if (style === 'typewriter') {
+    rect4(KB.x + 8, KB.y - 4, 12, 4, 'W');
+    rect4(KB.x + 8, KB.y - 4, 12, 1, 'k');
+    if (typing) rect4(KB.x + 9, KB.y - 2, 1 + (Math.floor(now / 140) % 10), 1, 'k');
+  }
   rect4(KB.x, KB.y, KB.w, KB.h, 'k');
-  rect4(KB.x + 1, KB.y + 1, KB.w - 2, KB.h - 2, mech ? '#2f2b38' : 'g');
+  rect4(KB.x + 1, KB.y + 1, KB.w - 2, KB.h - 2, KB_BASE[style]);
   // 타이핑 중엔 키가 하나씩 눌린다 — 빠르게 옮겨 다니며 콩콩
-  const pressedIdx = mech && typing ? (Math.floor(now / 140) * 7) % 24 : -1;
+  const pressedIdx = clicky && typing ? (Math.floor(now / 140) * 7) % 24 : -1;
   let i = 0;
   for (let ky = KB.y + 2; ky < KB.y + KB.h - 1; ky += 2) {
     for (let kx = KB.x + 2; kx < KB.x + KB.w - 2; kx += 2) {
-      if (mech) {
-        const pressed = i === pressedIdx;
-        px4(kx, ky + (pressed ? 1 : 0), pressed ? '#8f8f98' : MECH_CAPS[i % 5]);
-      } else {
-        px4(kx, ky, 'h');
-      }
+      const pressed = i === pressedIdx;
+      let cap;
+      if (style === 'mech') cap = MECH_CAPS[i % 5];
+      else if (style === 'rgb') {
+        // 무지개가 왼쪽에서 오른쪽으로 흐른다 — 타이핑하면 빠르게
+        const h = (i * 30 + Math.floor(now / (typing ? 8 : 40))) % 360;
+        cap = `hsl(${h},85%,62%)`;
+      } else if (style === 'typewriter') cap = 'W';
+      else if (style === 'crystal') cap = Math.floor(now / 350 + i * 1.3) % 7 === 0 ? 'W' : 'V';
+      else cap = 'h';
+      px4(kx, ky + (pressed ? 1 : 0), pressed ? '#8f8f98' : cap);
       i++;
     }
   }
@@ -1345,8 +1858,7 @@ if (!PET_DEFS[petKind]) petKind = 'cat';
 /* 꾸미기 선택 (책상 소품 / 액세서리 / 스킨 / 책상 / 키보드) — 레벨·업적으로 잠금 해제 */
 let deskItem = params.get('desk') || localStorage.getItem('deskItem') || 'coffee';
 if (!DESK_ITEMS[deskItem]) deskItem = 'coffee';
-let petAcc = params.get('acc') || localStorage.getItem('petAcc') || 'none';
-if (!ACC_ITEMS[petAcc]) petAcc = 'none';
+let petAcc = parseAccs(params.get('acc') || localStorage.getItem('petAcc')); // 키 배열
 let petSkin = params.get('skin') || localStorage.getItem('petSkin') || 'none';
 if (!SKINS[petSkin]) petSkin = 'none';
 let deskStyle = params.get('deskstyle') || localStorage.getItem('deskStyle') || 'basic';
@@ -1583,7 +2095,9 @@ function addXp(n) {
       ...Object.values(DESK_ITEMS), ...Object.values(ACC_ITEMS),
       ...Object.values(SKINS), ...Object.values(DESK_STYLES), ...Object.values(KB_ITEMS),
     ].filter((it) => !it.ach && it.lv > prevLevel && it.lv <= game.level);
-    if (news.length) showToast(`🔓 해제: ${news.map((it) => `${it.emoji} ${it.label}`).join(', ')}`);
+    const names = news.map((it) => `${it.emoji} ${it.label}`);
+    if (prevLevel < ACC_STACK_LV && game.level >= ACC_STACK_LV) names.push('👓+🧣 액세서리 겹쳐 착용');
+    if (names.length) showToast(`🔓 해제: ${names.join(', ')}`);
     pushScore();
   }
   if (dropped) {
@@ -1629,9 +2143,35 @@ function loadStats() {
 
 const stats = loadStats();
 
+let statsPushTimer = null;
 function saveStats() {
   if (SANDBOX) return;
   try { localStorage.setItem('petStats', JSON.stringify(stats)); } catch (_) { /* 무시 */ }
+  // 업적·도감은 서버에서 합치므로 다른 PC에서도 이어진다 — 잦은 저장은 묶어서 한 번만
+  clearTimeout(statsPushTimer);
+  statsPushTimer = setTimeout(() => pushScore(), 30000);
+}
+
+/* 서버가 합쳐 준 통계를 로컬에 얹는다 — 서버 병합과 같은 규칙(큰 쪽 / or / 합집합)이라
+ * 몇 번을 반복해도 값이 줄어드는 일은 없다 */
+function adoptStats(r) {
+  if (!r || typeof r !== 'object') return;
+  const before = JSON.stringify(stats);
+  for (const k of ['pomos', 'keys', 'bestStreak']) stats[k] = Math.max(stats[k], Math.floor(+r[k]) || 0);
+  for (const k of ['early', 'top1']) stats[k] = stats[k] || !!r[k];
+  for (const key of ['visitors', 'pomoMonths']) {
+    if (!r[key] || typeof r[key] !== 'object') continue;
+    for (const [k, v] of Object.entries(r[key])) {
+      stats[key][k] = Math.max(stats[key][k] || 0, Math.floor(+v) || 0);
+    }
+  }
+  if (Array.isArray(r.done)) {
+    for (const id of r.done) if (ACHIEVEMENTS[id] && !stats.done.includes(id)) stats.done.push(id);
+  }
+  if (JSON.stringify(stats) === before) return;
+  try { localStorage.setItem('petStats', JSON.stringify(stats)); } catch (_) { /* 무시 */ }
+  checkAchievements();
+  if (!achPanel.classList.contains('hidden')) renderAch();
 }
 
 const ACHIEVEMENTS = {
@@ -1668,6 +2208,10 @@ const ACHIEVEMENTS = {
     emoji: '🎄', label: '겨울 준비', desc: '11월 한 달간 뽀모도로 20회 완주',
     goal: 20, val: () => monthPomos('11'), reward: ['ice', 'tree'],
   },
+  eventBlossom: {
+    emoji: '🌸', label: '봄나들이', desc: '4~5월 두 달간 뽀모도로 20회 완주',
+    goal: 20, val: () => monthPomos(['04', '05']), reward: ['blossom', 'vase'],
+  },
 };
 
 /* 보상은 하나(문자열)일 수도, 세트(배열)일 수도 있다 — 소품/스킨 어느 쪽이든 */
@@ -1677,13 +2221,17 @@ function rewardItems(a) {
   return keys.map((k) => DESK_ITEMS[k] || SKINS[k]).filter(Boolean);
 }
 
-/* 그 달(어느 해든)에 완주한 뽀모도로 최고 기록 — 이벤트는 매년 돌아온다 */
+/* 그 달(어느 해든)에 완주한 뽀모도로 최고 기록 — 이벤트는 매년 돌아온다.
+ * 여러 달을 주면 같은 해 안에서 합친다 (4~5월 봄 이벤트) */
 function monthPomos(mm) {
-  let best = 0;
+  const months = Array.isArray(mm) ? mm : [mm];
+  const byYear = {};
   for (const [k, v] of Object.entries(stats.pomoMonths)) {
-    if (k.endsWith(`-${mm}`)) best = Math.max(best, +v || 0);
+    if (!months.includes(k.slice(5, 7))) continue;
+    const yr = k.slice(0, 4);
+    byYear[yr] = (byYear[yr] || 0) + (+v || 0);
   }
-  return best;
+  return Math.max(0, ...Object.values(byYear));
 }
 
 // 테스트 모드에서 ?ach=1 이면 업적도 전부 열어 본다 (저장 안 됨)
@@ -1695,15 +2243,36 @@ function achUnlocked(id) {
   return stats.done.includes(id);
 }
 
+/* 시즌 아이템이면 지금 그 달인가 */
+const MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+function inSeason(it) {
+  if (!it || !it.season) return true;
+  return it.season.includes(String(new Date().getMonth() + 1).padStart(2, '0'));
+}
+const seasonLabel = (it) => `${MONTH_NAMES[+it.season[0] - 1]}~${MONTH_NAMES[+it.season[it.season.length - 1] - 1]}`;
+
+/* 못 쓰는 아이템인가 — 레벨 부족 / 업적 미달성 / 철 지남 */
+function itemLocked(it) {
+  if (!it) return false;
+  if (it.ach ? !achUnlocked(it.ach) : it.lv > game.level) return true;
+  return !inSeason(it);
+}
+
 /* 잠긴 아이템이 장착된 채로 시작하면(테스트 모드에서 골랐거나 데이터가 꼬였거나)
  * 기본값으로 되돌린다. 데모 URL 파라미터로 지정한 경우는 그대로 둔다 */
 (function sanitizeEquipped() {
   if (SANDBOX || params.get('desk') || params.get('acc') || params.get('skin') ||
       params.get('deskstyle') || params.get('kb')) return;
-  const locked = (it) => (it.ach ? !achUnlocked(it.ach) : it.lv > game.level);
+  const locked = itemLocked;
+  // 액세서리는 여러 개라 잠긴 것만 골라 벗긴다
+  let okAcc = petAcc.filter((k) => !locked(ACC_ITEMS[k]));
+  if (!canStackAcc()) okAcc = okAcc.slice(0, 1);
+  if (okAcc.length !== petAcc.length) {
+    petAcc = okAcc;
+    try { localStorage.setItem('petAcc', accsKey(petAcc)); } catch (_) { /* 무시 */ }
+  }
   const fix = [
     ['deskItem', DESK_ITEMS[deskItem], 'coffee', (v) => { deskItem = v; }],
-    ['petAcc', ACC_ITEMS[petAcc], 'none', (v) => { petAcc = v; }],
     ['petSkin', SKINS[petSkin], 'none', (v) => { petSkin = v; }],
     ['deskStyle', DESK_STYLES[deskStyle], 'basic', (v) => { deskStyle = v; }],
     ['kbStyle', KB_ITEMS[kbStyle], 'basic', (v) => { kbStyle = v; }],
@@ -1849,10 +2418,11 @@ function sbRpc(fn, args) {
 // 서버가 아직 잔디/꾸미기 칼럼을 모르는 경우(스키마 미적용) 점수까지 막히지 않게 한 번만 물러선다
 let pomoSyncOff = false;
 let decoSyncOff = false;
+let statsSyncOff = false;
 
 /* 지금 착용 중인 꾸미기 한 벌 — 서버에 올려 두면 친구들이 책상 구경을 할 수 있다 */
 function currentDeco() {
-  return { desk: deskItem, acc: petAcc, skin: petSkin, deskStyle, kb: kbStyle };
+  return { desk: deskItem, acc: accsKey(petAcc), skin: petSkin, deskStyle, kb: kbStyle };
 }
 
 /* 점수 업로드. interactive는 "사용자가 방금 저장을 눌렀다"는 뜻 —
@@ -1869,30 +2439,28 @@ async function pushScore({ interactive = false } = {}) {
   };
   const withPomo = { ...args, p_device: deviceId, p_pomo: pomoMine };
   const withDeco = { ...withPomo, p_deco: currentDeco() };
+  const withStats = { ...withDeco, p_stats: stats };
+  // 스키마가 낡은 순서대로 한 단계씩 물러선다: 업적 빼고 → 꾸미기 빼고 → 잔디도 빼고
+  const tiers = [
+    [() => statsSyncOff, () => { statsSyncOff = true; }, withStats],
+    [() => decoSyncOff, () => { decoSyncOff = true; }, withDeco],
+    [() => pomoSyncOff, () => { pomoSyncOff = true; }, withPomo],
+    [() => false, () => {}, args],
+  ];
   try {
     let res;
-    try {
-      res = await sbRpc('upsert_score',
-        decoSyncOff ? (pomoSyncOff ? args : withPomo) : withDeco);
-    } catch (err) {
-      if (!`${err.message}`.includes('404')) throw err;
-      // 스키마가 낡은 순서대로 한 단계씩 물러선다: deco 빼고 → 잔디도 빼고
-      if (!decoSyncOff) {
-        decoSyncOff = true;
-        try {
-          res = await sbRpc('upsert_score', pomoSyncOff ? args : withPomo);
-        } catch (err2) {
-          if (pomoSyncOff || !`${err2.message}`.includes('404')) throw err2;
-          pomoSyncOff = true;
-          res = await sbRpc('upsert_score', args);
-        }
-      } else if (!pomoSyncOff) {
-        pomoSyncOff = true;
-        res = await sbRpc('upsert_score', args);
-      } else {
-        throw err;
+    for (let i = 0; i < tiers.length; i++) {
+      const [off, turnOff, payload] = tiers[i];
+      if (off()) continue;
+      try {
+        res = await sbRpc('upsert_score', payload);
+        break;
+      } catch (err) {
+        if (i === tiers.length - 1 || !`${err.message}`.includes('404')) throw err;
+        turnOff();
       }
     }
+    if (res && res.stats) adoptStats(res.stats);
     if (res && res.error) {
       if (res.error === 'nickname_taken') {
         setNickTaken(true);
@@ -1953,7 +2521,7 @@ function adoptState(s) {
     const d = s.deco;
     try {
       if (DESK_ITEMS[d.desk]) { deskItem = d.desk; localStorage.setItem('deskItem', d.desk); }
-      if (ACC_ITEMS[d.acc]) { petAcc = d.acc; localStorage.setItem('petAcc', d.acc); }
+      if (typeof d.acc === 'string') { petAcc = parseAccs(d.acc); localStorage.setItem('petAcc', accsKey(petAcc)); }
       if (SKINS[d.skin]) { petSkin = d.skin; localStorage.setItem('petSkin', d.skin); }
       if (DESK_STYLES[d.deskStyle]) { deskStyle = d.deskStyle; localStorage.setItem('deskStyle', d.deskStyle); }
       if (KB_ITEMS[d.kb]) { kbStyle = d.kb; localStorage.setItem('kbStyle', d.kb); }
@@ -2002,6 +2570,7 @@ async function syncOnStart() {
     if (!res || res.error) return;
     // 잔디는 레벨보다 먼저 받는다 — 이 PC가 최신이어도 다른 PC가 심어 둔 날이 있을 수 있다
     adoptOthers(res.pomo_others);
+    adoptStats(res.stats); // 업적도 마찬가지 — 최신 PC와 무관하게 합친다
     const lastPush = localStorage.getItem('lastPushAt') || '';
     // 같은 서버가 찍은 ISO 타임스탬프라 문자열 비교로 충분
     if (lastPush && res.updated_at <= lastPush) return; // 이 PC가 최신
@@ -2223,7 +2792,7 @@ function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
   ctx.imageSmoothingEnabled = false;
   petKind = PET_DEFS[r.pet] ? r.pet : 'cat';
   deskItem = DESK_ITEMS[d.desk] ? d.desk : 'coffee';
-  petAcc = vis.acc && ACC_ITEMS[d.acc] ? d.acc : 'none';
+  petAcc = vis.acc ? parseAccs(d.acc) : [];
   petSkin = SKINS[d.skin] ? d.skin : 'none';
   deskStyle = vis.full && DESK_STYLES[d.deskStyle] ? d.deskStyle : 'basic';
   kbStyle = vis.full && KB_ITEMS[d.kb] ? d.kb : 'basic';
@@ -2239,7 +2808,7 @@ function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
   renderPet(EYE_OPEN, 0);
   skinMap = null;
   drawSkinSparkle(0, 0);
-  drawDesk();
+  drawDesk(0);
   const below = PET_DEFS[petKind].below;
   if (below) {
     skinMap = petSkinMap(0);
@@ -2461,7 +3030,7 @@ function render(now) {
      now - state.lastMouse < 450 && state.lastMouse > state.lastKey);
   const wiggle = mousing ? (Math.sin(now / 120) > 0 ? 1 : 0) : 0;
 
-  drawDesk();
+  drawDesk(now);
   const below = PET_DEFS[petKind].below;
   if (below) {
     skinMap = petSkinMap(now);
@@ -2941,17 +3510,20 @@ function queueDecoPush() {
 function decoButton(emoji, label, selected, it, pick) {
   const btn = document.createElement('button');
   const byAch = !!(it && it.ach);
-  const locked = byAch ? !achUnlocked(it.ach) : (it ? it.lv : 1) > game.level;
-  const hint = byAch
+  const offSeason = !!(it && !inSeason(it));       // 업적은 있는데 철이 아닌 시즌 아이템
+  const locked = itemLocked(it);
+  const hint = byAch && !achUnlocked(it.ach)
     ? `업적 「${ACHIEVEMENTS[it.ach].label}」(${ACHIEVEMENTS[it.ach].desc})을 달성하면 열려요`
-    : `Lv.${it && it.lv}이 되면 열려요`;
-  btn.textContent = locked ? (byAch ? '❓' : `🔒${it.lv}`) : emoji;
+    : offSeason ? `${seasonLabel(it)}에만 쓸 수 있어요`
+      : `Lv.${it && it.lv}이 되면 열려요`;
+  btn.textContent = locked ? (byAch ? (achUnlocked(it.ach) ? '💤' : '❓') : `🔒${it.lv}`) : emoji;
   btn.title = locked ? `${label} — ${hint}` : label;
   btn.classList.toggle('sel', selected);
   btn.classList.toggle('lock', locked);
   btn.addEventListener('click', () => {
     if (locked) {
-      showToast(byAch ? `❓ ${hint}` : `🔒 ${label}은(는) Lv.${it.lv}이 되면 열려요`);
+      showToast(offSeason && achUnlocked(it.ach) ? `💤 ${label}은(는) ${hint}`
+        : byAch ? `❓ ${hint}` : `🔒 ${label}은(는) Lv.${it.lv}이 되면 열려요`);
       return;
     }
     pick();
@@ -2961,16 +3533,47 @@ function decoButton(emoji, label, selected, it, pick) {
   return btn;
 }
 
+/* 아이템이 수십 개라 다 펼치면 패널이 창을 넘는다 — 레벨 잠금은 "다음 2개"만 보이고
+ * 나머지와 업적 미달성(❓)은 「…+N」 칩 뒤에 접는다 (업적 보상은 업적 패널에 이미 적혀 있다).
+ * 철 지난 시즌 아이템(💤)은 이미 얻은 것이니 그대로 보인다 */
+const FOLD_PEEK = 2;
+const unfolded = new Set();
+function fillRow(elId, entries) {
+  const el = document.getElementById(elId);
+  const lvLocked = entries.filter((e) => e.it && !e.it.ach && e.it.lv > game.level)
+    .sort((a, b) => a.it.lv - b.it.lv);
+  const achLocked = entries.filter((e) => e.it && e.it.ach && !achUnlocked(e.it.ach));
+  const foldable = [...lvLocked.slice(FOLD_PEEK), ...achLocked];
+  const hidden = unfolded.has(elId) ? [] : foldable;
+  const nodes = entries.filter((e) => !hidden.includes(e)).map((e) => e.btn);
+  if (hidden.length) {
+    const more = document.createElement('button');
+    more.className = 'more';
+    more.textContent = `…+${hidden.length}`;
+    more.title = `잠긴 아이템 ${hidden.length}개 더 보기`;
+    more.addEventListener('click', () => { unfolded.add(elId); renderDeco(); });
+    nodes.push(more);
+  } else if (unfolded.has(elId) && foldable.length) {
+    const less = document.createElement('button');
+    less.className = 'more';
+    less.textContent = '접기';
+    less.addEventListener('click', () => { unfolded.delete(elId); renderDeco(); });
+    nodes.push(less);
+  }
+  el.replaceChildren(...nodes);
+}
+
 /* 무엇으로 바뀌었는지 말풍선으로 알려 준다 — 아이콘만으로는 뭔지 모른다 */
 function decoRow(elId, items, getSel, setSel, storeKey, say) {
-  document.getElementById(elId).replaceChildren(
-    ...Object.entries(items).map(([k, it]) =>
-      decoButton(it.emoji, it.label, getSel() === k, it, () => {
-        if (getSel() === k) return; // 이미 고른 것 — 말풍선까지 띄울 일은 아니다
-        setSel(k);
-        try { localStorage.setItem(storeKey, k); } catch (_) { /* 무시 */ }
-        showToast(say(it, k));
-      })));
+  fillRow(elId, Object.entries(items).map(([k, it]) => ({
+    it,
+    btn: decoButton(it.emoji, it.label, getSel() === k, it, () => {
+      if (getSel() === k) return; // 이미 고른 것 — 말풍선까지 띄울 일은 아니다
+      setSel(k);
+      try { localStorage.setItem(storeKey, k); } catch (_) { /* 무시 */ }
+      showToast(say(it, k));
+    }),
+  })));
 }
 
 const PET_LABELS = { cat: '고양이', dog: '강아지', rabbit: '토끼', hamster: '햄스터', otter: '해달' };
@@ -2989,8 +3592,34 @@ function renderDeco() {
     (it, k) => (k === 'none' ? '🐾 기본 스킨으로 돌아왔어요' : `${it.emoji} ${it.label} 스킨 적용!`));
   decoRow('deco-desk', DESK_ITEMS, () => deskItem, (k) => { deskItem = k; }, 'deskItem',
     (it) => `${it.emoji} ${it.label} 놓았어요!`);
-  decoRow('deco-acc', ACC_ITEMS, () => petAcc, (k) => { petAcc = k; }, 'petAcc',
-    (it, k) => (k === 'none' ? '액세서리를 벗었어요' : `${it.emoji} ${it.label} 착용!`));
+  // 액세서리는 토글 — Lv.33부터 슬롯이 다르면 겹쳐 입고, 같은 슬롯은 갈아입는다. ✕는 전부 벗기
+  const accRow = document.getElementById('deco-acc');
+  accRow.title = canStackAcc()
+    ? '자리(눈·머리·목)가 다르면 겹쳐 착용할 수 있어요'
+    : `Lv.${ACC_STACK_LV}이 되면 겹쳐 착용할 수 있어요`;
+  fillRow('deco-acc', Object.entries(ACC_ITEMS).map(([k, it]) => {
+    const on = k === 'none' ? petAcc.length === 0 : petAcc.includes(k);
+    return { it, btn: decoButton(it.emoji, it.label, on, it, () => {
+        if (on) {
+          if (k === 'none') return;
+          petAcc = petAcc.filter((x) => x !== k);
+          showToast(`${it.emoji} ${it.label} 벗었어요`);
+        } else if (k === 'none') {
+          petAcc = [];
+          showToast('액세서리를 전부 벗었어요');
+        } else if (!canStackAcc()) {
+          petAcc = [k]; // 아직은 하나만 — 겹쳐 입기는 Lv.33 보상
+          showToast(`${it.emoji} ${it.label} 착용! (Lv.${ACC_STACK_LV}부터 겹쳐 착용)`);
+        } else {
+          const swap = petAcc.find((x) => ACC_ITEMS[x].slot === it.slot);
+          petAcc = parseAccs([...petAcc, k].join(','));
+          showToast(swap
+            ? `${ACC_ITEMS[swap].emoji} → ${it.emoji} ${it.label}로 갈아 썼어요`
+            : `${it.emoji} ${it.label} 착용!`);
+        }
+        try { localStorage.setItem('petAcc', accsKey(petAcc)); } catch (_) { /* 무시 */ }
+      }) };
+  }));
   decoRow('deco-deskstyle', DESK_STYLES, () => deskStyle, (k) => { deskStyle = k; }, 'deskStyle',
     (it) => `${it.emoji} ${it.label}으로 교체!`);
   decoRow('deco-kb', KB_ITEMS, () => kbStyle, (k) => { kbStyle = k; }, 'kbStyle',
@@ -3114,6 +3743,21 @@ setTimeout(checkAchievements, 1200);
 
 if (SANDBOX) showToast(`🧪 테스트 모드 Lv.${SANDBOX_LEVEL} — 저장·업로드 꺼짐`);
 
+// 켜 둔 채로 달이 바뀌면 철 지난 스킨/소품을 치운다 (시작 시엔 sanitizeEquipped가 한다)
+setInterval(() => {
+  const checks = [
+    [SKINS[petSkin], 'petSkin', 'none', (v) => { petSkin = v; }],
+    [DESK_ITEMS[deskItem], 'deskItem', 'coffee', (v) => { deskItem = v; }],
+  ];
+  for (const [it, key, def, set] of checks) {
+    if (!it || inSeason(it)) continue;
+    set(def);
+    try { localStorage.setItem(key, def); } catch (_) { /* 무시 */ }
+    showToast(`${it.emoji} ${it.label}은(는) ${seasonLabel(it)}에 다시 꺼낼 수 있어요`);
+    queueDecoPush();
+  }
+}, 60000);
+
 // 이벤트 달이면 그 달에 한 번만 알려 준다 (이미 받은 스킨이면 조용히)
 (function eventNotice() {
   if (DEMO || SANDBOX) return;
@@ -3122,7 +3766,9 @@ if (SANDBOX) showToast(`🧪 테스트 모드 Lv.${SANDBOX_LEVEL} — 저장·�
     ? '🎃 이벤트! 9월에 뽀모도로 20회 완주하면 👻 유령 스킨을 받아요'
     : mm === '11' && !achUnlocked('eventIce')
       ? '🎄 이벤트! 11월에 뽀모도로 20회 완주하면 ❄️ 아이스 스킨을 받아요'
-      : '';
+      : (mm === '04' || mm === '05') && !achUnlocked('eventBlossom')
+        ? '🌸 이벤트! 4~5월에 뽀모도로 20회 완주하면 🌸 벚꽃 스킨을 받아요'
+        : '';
   const key = `eventNotice-${dayKey(new Date()).slice(0, 7)}`;
   if (!ev || localStorage.getItem(key) === '1') return;
   try { localStorage.setItem(key, '1'); } catch (_) { /* 무시 */ }
