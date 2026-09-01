@@ -299,6 +299,19 @@ button:active {
   line-height: 0.6;
 }
 #rank-list li.rank-gap:hover { background: none; }
+/* 이번 주 / 전체 탭 — 꾸미기 패널의 선택 버튼과 같은 노랑 */
+#rank-tabs { gap: 6px; }
+.rank-tab {
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.rank-tab.sel { background: #ffe98a; }
+#rank-caption {
+  font-size: 9px;
+  color: #8a5f3c;
+  text-align: center;
+  margin-top: -4px;
+}
 #nickname,
 #link-nick,
 #link-code {

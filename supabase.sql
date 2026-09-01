@@ -1,6 +1,7 @@
--- 리더보드 스키마 v6 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기
--- (v6에서 바뀐 것: deco 칼럼 — 착용 중인 꾸미기 한 벌을 저장해
---  랭킹에서 "친구 책상 구경"을 보여 주고, 다른 PC와 꾸미기를 동기화한다)
+-- 리더보드 스키마 v8 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기 + 업적 + 주간 랭킹
+-- (v8에서 바뀐 것: total_xp / week_key / week_xp 칼럼 — 이번 주에 얻은 경험치를
+--  서버가 세어 두어, 누적 레벨과 별개로 "이번 주" 랭킹을 보여 준다)
+-- (v7: stats 칼럼 — 업적 통계를 서버에서 합친다)
 -- (Supabase 대시보드 > SQL Editor에서 1회 실행. 옛 버전에서 업그레이드해도,
 --  새 프로젝트에 처음 실행해도 동작한다)
 --
@@ -48,6 +49,19 @@ alter table public.leaderboard
 alter table public.leaderboard
   add column if not exists stats jsonb not null default '{}'::jsonb;
 
+-- v7 → v8: 주간 랭킹. 누적 랭킹은 고레벨이 늘 위에 있어 늦게 시작한 사람은
+-- 만년 하위권이다 — "이번 주에 얼마나 했나"로 겨루는 판을 하나 더 둔다.
+--   total_xp: 마지막 업로드 때의 누적 경험치 (레벨+경험치를 한 수로 편 것).
+--             다음 업로드와의 차이가 그 사이에 번 경험치다. null이면 아직 기준점이 없다
+--             (v8 적용 전부터 있던 행) — 첫 업로드는 기준점만 잡고 주간에 더하지 않는다.
+--   week_key: week_xp가 어느 주 것인지 (그 주 일요일 날짜, 한국 시간).
+--   week_xp:  그 주에 번 경험치. 주가 바뀌면 0부터 다시 센다.
+alter table public.leaderboard add column if not exists total_xp bigint;
+alter table public.leaderboard add column if not exists week_key text;
+alter table public.leaderboard add column if not exists week_xp int not null default 0;
+create index if not exists leaderboard_week_idx
+  on public.leaderboard (week_key, week_xp desc);
+
 -- 개수로 세던 중간 버전에서 올라오는 경우: 한 개를 25분으로 환산해 옮긴다
 do $$
 begin
@@ -88,7 +102,7 @@ create policy "누구나 읽기" on public.leaderboard
 -- pomo_by_device(기기 목록)는 공개 키로 조회되면 안 되므로 권한에서 뺀다.
 -- 아래 RPC들은 security definer라 소유자 권한으로 돌아 그대로 동작한다.
 revoke all on public.leaderboard from anon, authenticated;
-grant select (nickname, level, xp, pet, updated_at, deco)
+grant select (nickname, level, xp, pet, updated_at, deco, week_key, week_xp)
   on public.leaderboard to anon, authenticated;
 
 -- 동기화 코드 해시 — 새로 만드는 건 bcrypt(솔트 자동 포함)
@@ -231,6 +245,32 @@ as $$
   ) t;
 $$;
 
+-- 레벨 + 경험치 → 누적 경험치 한 수. pet.js의 XP_PER_LEVEL(lv) = lv × 1000 과 짝:
+-- Lv.L에 닿기까지 1000 + 2000 + … + (L-1)×1000 = 1000 × L × (L-1) / 2.
+-- 레벨업 공식이 또 바뀌면 여기도 맞춰야 한다 — 안 맞추면 그 뒤 첫 업로드에서
+-- 모두의 주간 점수가 한 번 튄다 (누적 랭킹에는 영향 없음).
+create or replace function public.total_xp(p_level int, p_xp int)
+returns bigint
+language sql
+immutable
+as $$
+  select 1000::bigint * p_level * (p_level - 1) / 2 + p_xp;
+$$;
+
+-- 이번 주 열쇠 = 이번 주 일요일 날짜(한국 시간). 일요일 0시에 모두 함께 리셋된다.
+-- (잔디밭의 "이번 주"도 일요일 시작이라 맞췄다. date_trunc('week')는 월요일 기준이므로 안 쓴다)
+-- pet.js의 weekKeyKST()와 같은 규칙 — 앱은 이 값으로 이번 주 행만 골라 읽는다.
+create or replace function public.current_week_key()
+returns text
+language sql
+stable
+as $$
+  select to_char(
+    (now() at time zone 'Asia/Seoul')::date
+      - extract(dow from now() at time zone 'Asia/Seoul')::int,
+    'YYYY-MM-DD');
+$$;
+
 -- 점수 등록/갱신: 닉네임이 비어 있으면 새로 등록(코드 해시 저장),
 -- 코드가 맞으면 갱신, 레거시 행(secret_hash null)은 먼저 온 사람이 선점,
 -- 남의 닉네임이면 nickname_taken.
@@ -257,6 +297,9 @@ declare
   v_row public.leaderboard;
   v_devices jsonb;
   v_stats jsonb;
+  v_total bigint;
+  v_week text := public.current_week_key();
+  v_week_xp bigint;
 begin
   if v_nick is null or v_nick = '' or length(v_nick) > 12 then
     return jsonb_build_object('error', 'bad_nickname');
@@ -270,6 +313,7 @@ begin
      or p_pet not in ('cat', 'dog', 'rabbit', 'hamster', 'otter') then
     return jsonb_build_object('error', 'bad_input');
   end if;
+  v_total := public.total_xp(p_level, p_xp);
 
   select * into v_row from public.leaderboard
     where lower(nickname) = lower(v_nick);
@@ -298,9 +342,10 @@ begin
 
   if not found then
     begin
-      insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device, deco, stats)
+      insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device, deco, stats,
+                                      total_xp, week_key, week_xp)
       values (v_nick, public.hash_secret(p_secret), p_level, p_xp, p_pet, v_devices,
-              public.clean_deco(p_deco), v_stats)
+              public.clean_deco(p_deco), v_stats, v_total, v_week, 0)
       returning * into v_row;
     exception when unique_violation then
       return jsonb_build_object('error', 'nickname_taken');
@@ -312,6 +357,15 @@ begin
         then public.hash_secret(p_secret)
       else v_row.secret_hash
     end;
+    -- 이번 주 경험치: 주가 바뀌었으면 0부터, 아니면 지난 업로드 이후 늘어난 만큼 더한다.
+    -- 잠들거나 잔소리로 깎인 만큼은 빼되 0 밑으로는 안 내려간다 (이번 주 "번" 점수니까).
+    -- 기준점(total_xp)이 없는 행은 이번에 기준점만 찍는다 — 옛 행의 누적 전체가
+    -- 이번 주 점수로 잡히면 안 된다. 앱 버전과 무관하게 서버가 세므로 옛 앱도 집계된다.
+    v_week_xp := case when v_row.week_key is distinct from v_week then 0
+                      else coalesce(v_row.week_xp, 0) end;
+    if v_row.total_xp is not null then
+      v_week_xp := greatest(0, v_week_xp + (v_total - v_row.total_xp));
+    end if;
     update public.leaderboard
       set nickname = v_nick, secret_hash = v_hash,
           level = p_level, xp = p_xp, pet = p_pet,
@@ -320,6 +374,9 @@ begin
           deco = case when p_deco is null then coalesce(v_row.deco, '{}'::jsonb)
                       else public.clean_deco(p_deco) end,
           stats = v_stats,
+          total_xp = v_total,
+          week_key = v_week,
+          week_xp = least(v_week_xp, 2000000000)::int,
           updated_at = now()
       where lower(nickname) = lower(v_nick)
       returning * into v_row;
@@ -383,3 +440,5 @@ revoke execute on function public.clean_deco(jsonb) from public, anon, authentic
 revoke execute on function public.sum_pomo(jsonb, text) from public, anon, authenticated;
 revoke execute on function public.clean_stats(jsonb) from public, anon, authenticated;
 revoke execute on function public.merge_stats(jsonb, jsonb) from public, anon, authenticated;
+revoke execute on function public.total_xp(int, int) from public, anon, authenticated;
+revoke execute on function public.current_week_key() from public, anon, authenticated;

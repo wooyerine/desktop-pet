@@ -2581,17 +2581,35 @@ async function syncOnStart() {
 }
 
 const rankList = document.getElementById('rank-list');
+const rankCaption = document.getElementById('rank-caption');
+
+/* 랭킹 탭: 'week'(이번 주 번 경험치) / 'all'(누적 레벨).
+ * 누적은 고레벨이 늘 위라 늦게 시작한 사람은 만년 하위권이다 — 그래서 기본은 이번 주 */
+let rankMode = 'week';
+
+/* 이번 주 열쇠 = 이번 주 일요일 날짜(한국 시간, YYYY-MM-DD) — 잔디밭의 "이번 주"와 같은 일요일 시작.
+ * 서버의 current_week_key()와 같은 규칙이어야 이번 주 행을 제대로 고른다.
+ * KST는 서머타임이 없어 고정 +9시간으로 충분하다 */
+function weekKeyKST(now = Date.now()) {
+  const kst = new Date(now + 9 * 3600000);
+  kst.setUTCDate(kst.getUTCDate() - kst.getUTCDay()); // 일=0 … 토=6
+  return kst.toISOString().slice(0, 10);
+}
 
 /* 레벨 배지 — 리더보드에서 고레벨이 한눈에 보인다 */
 function lvBadge(lv) {
   return lv >= 30 ? ' 💎' : lv >= 20 ? ' 🌟' : lv >= 10 ? ' ⭐' : '';
 }
 
-function rankLine(r, rank) {
+/* 랭킹 한 줄. rank가 null이면 등수 없이 (이번 주 아직 0점인 나) */
+function rankLine(r, rank, weekly = false) {
   const li = document.createElement('li');
+  const score = weekly
+    ? `+${Math.max(0, +r.week_xp || 0).toLocaleString()}`
+    : `Lv.${r.level} (${r.xp})`;
   li.textContent =
-    `${rank}위 ${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}${lvBadge(r.level)}` +
-    ` — Lv.${r.level} (${r.xp})`;
+    `${rank == null ? '' : `${rank}위 `}${PET_EMOJI[r.pet] || '🐾'} ${r.nickname}${lvBadge(r.level)}` +
+    ` — ${score}`;
   if (nickname && r.nickname.toLowerCase() === nickname.toLowerCase()) {
     li.classList.add('me');
   }
@@ -2600,9 +2618,8 @@ function rankLine(r, rank) {
   return li;
 }
 
-// 내 등수 = 나보다 앞선 사람 수 + 1 (레벨 → 경험치 순, 동점이면 공동 순위)
-async function sbMyRank(level, xp) {
-  const filter = `or=(level.gt.${level},and(level.eq.${level},xp.gt.${xp}))`;
+// 내 등수 = 나보다 앞선 사람 수 + 1 (동점이면 공동 순위). filter는 "나보다 앞선 사람" 조건
+async function sbMyRank(filter) {
   const res = await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=nickname&${filter}`, {
     method: 'HEAD',
     headers: {
@@ -2619,8 +2636,9 @@ async function sbMyRank(level, xp) {
 // 랭킹을 다시 그리는 사이 늦게 도착한 "내 순위" 줄이 새 리스트에 붙지 않게 한다
 let rankLoadSeq = 0;
 
-/* 내가 10위 밖이어도 내 순위는 보이게 — 리스트 밑에 "⋯ / n위 나"를 붙인다 */
-async function appendMyRank(rows, cols, seq) {
+/* 내가 10위 밖이어도 내 순위는 보이게 — 리스트 밑에 "⋯ / n위 나"를 붙인다.
+ * 이번 주 탭에서 아직 0점이면 등수 없이 "+0"으로 내 줄만 붙인다 (없는 것보다 낫다) */
+async function appendMyRank(rows, cols, seq, weekly, weekKey) {
   if (!nickname) return;
   if (rows.some((r) => r.nickname.toLowerCase() === nickname.toLowerCase())) return;
   try {
@@ -2629,14 +2647,38 @@ async function appendMyRank(rows, cols, seq) {
       `${SB_TABLE}?select=${cols}&nickname=ilike.${encodeURIComponent(pat)}&limit=1`
     );
     if (!mine || !mine.length) return; // 아직 서버에 점수를 올린 적이 없다
-    const rank = await sbMyRank(mine[0].level, mine[0].xp);
-    if (rank == null || seq !== rankLoadSeq) return;
+    const me = mine[0];
+    let rank = null;
+    if (weekly) {
+      // 지난주 점수가 남아 있는 행은 이번 주 0점이다
+      if (me.week_key !== weekKey) me.week_xp = 0;
+      if (me.week_xp > 0) {
+        rank = await sbMyRank(
+          `week_key=eq.${encodeURIComponent(weekKey)}&week_xp=gt.${me.week_xp}`
+        );
+        if (rank == null) return;
+      }
+    } else {
+      rank = await sbMyRank(`or=(level.gt.${me.level},and(level.eq.${me.level},xp.gt.${me.xp}))`);
+      if (rank == null) return;
+    }
+    if (seq !== rankLoadSeq) return;
     const gap = document.createElement('li');
     gap.className = 'rank-gap';
     gap.textContent = '⋯';
-    rankList.append(gap, rankLine(mine[0], rank));
+    rankList.append(gap, rankLine(me, rank, weekly));
   } catch {
     // 내 순위는 덤 — 실패해도 상위 10은 이미 떠 있다
+  }
+}
+
+/* 탭에 맞춰 캡션을 바꾼다 — 이번 주는 "언제부터 센 점수인지"가 곧 규칙 설명이다 */
+function updateRankCaption(weekKey) {
+  if (rankMode === 'week') {
+    const [, m, d] = weekKey.split('-');
+    rankCaption.textContent = `${+m}/${+d}(일)~ 얻은 경험치 · 일요일 0시 리셋`;
+  } else {
+    rankCaption.textContent = '누적 레벨 순';
   }
 }
 
@@ -2644,28 +2686,68 @@ async function loadRanking() {
   rankList.innerHTML = '<li>불러오는 중…</li>';
   hideRankPreview();
   const seq = ++rankLoadSeq;
+  const weekly = rankMode === 'week';
+  const weekKey = weekKeyKST();
+  updateRankCaption(weekKey);
   try {
-    let cols = 'nickname,level,xp,pet,deco';
+    let cols;
     let rows;
-    try {
-      rows = await sbFetch(`${SB_TABLE}?select=${cols}&order=level.desc,xp.desc&limit=10`);
-    } catch (err) {
-      // 옛 스키마 — deco 칼럼이 없으면 빼고 다시
-      if (!/40[04]/.test(`${err.message}`)) throw err;
-      cols = 'nickname,level,xp,pet';
-      rows = await sbFetch(`${SB_TABLE}?select=${cols}&order=level.desc,xp.desc&limit=10`);
-    }
-    if (!rows || !rows.length) {
-      rankList.innerHTML = '<li>아직 아무도 없어요 — 닉네임을 저장해 보세요!</li>';
-      return;
+    if (weekly) {
+      cols = 'nickname,level,xp,pet,deco,week_key,week_xp';
+      try {
+        rows = await sbFetch(
+          `${SB_TABLE}?select=${cols}&week_key=eq.${encodeURIComponent(weekKey)}` +
+          '&week_xp=gt.0&order=week_xp.desc,level.desc,xp.desc&limit=10'
+        );
+      } catch (err) {
+        // 서버가 아직 v7 이하 — 주간 칼럼이 없다
+        if (!/40[04]/.test(`${err.message}`)) throw err;
+        if (seq !== rankLoadSeq) return;
+        rankList.innerHTML = '<li>주간 랭킹은 서버 업데이트가 필요해요 (supabase.sql v8)</li>';
+        return;
+      }
+    } else {
+      cols = 'nickname,level,xp,pet,deco';
+      try {
+        rows = await sbFetch(`${SB_TABLE}?select=${cols}&order=level.desc,xp.desc&limit=10`);
+      } catch (err) {
+        // 옛 스키마 — deco 칼럼이 없으면 빼고 다시
+        if (!/40[04]/.test(`${err.message}`)) throw err;
+        cols = 'nickname,level,xp,pet';
+        rows = await sbFetch(`${SB_TABLE}?select=${cols}&order=level.desc,xp.desc&limit=10`);
+      }
     }
     if (seq !== rankLoadSeq) return;
-    rankList.replaceChildren(...rows.map((r, i) => rankLine(r, i + 1)));
-    checkTop1(rows);
-    appendMyRank(rows, cols, seq);
+    if (!rows || !rows.length) {
+      rankList.innerHTML = weekly
+        ? '<li>이번 주엔 아직 아무도 없어요 — 첫 번째가 되어 보세요!</li>'
+        : '<li>아직 아무도 없어요 — 닉네임을 저장해 보세요!</li>';
+      if (weekly) appendMyRank([], cols, seq, weekly, weekKey);
+      return;
+    }
+    rankList.replaceChildren(...rows.map((r, i) => rankLine(r, i + 1, weekly)));
+    // "정상 정복" 업적은 누적 1위 기준 — 주간 탭에서는 따로 확인한다
+    if (weekly) checkTop1(); else checkTop1(rows);
+    appendMyRank(rows, cols, seq, weekly, weekKey);
   } catch (err) {
     rankList.innerHTML = '<li>불러오기 실패 — 네트워크나 테이블을 확인해 주세요</li>';
   }
+}
+
+/* 탭 전환 */
+const rankTabs = { week: document.getElementById('tab-week'), all: document.getElementById('tab-all') };
+
+function setRankMode(mode) {
+  rankMode = mode;
+  for (const [k, btn] of Object.entries(rankTabs)) btn.classList.toggle('sel', k === mode);
+}
+
+for (const [k, btn] of Object.entries(rankTabs)) {
+  btn.addEventListener('click', () => {
+    if (rankMode === k) return;
+    setRankMode(k);
+    loadRanking();
+  });
 }
 
 /* ---- 친구 책상 구경 — 랭킹 줄을 클릭하면 펫이 그 사람의 책상을 "상상"한다.
@@ -3355,7 +3437,10 @@ function openPanel(target) {
 document.getElementById('btn-timer').addEventListener('click', () => openPanel(panel));
 
 document.getElementById('btn-rank').addEventListener('click', () => {
-  if (openPanel(rankPanel)) loadRanking();
+  if (openPanel(rankPanel)) {
+    setRankMode('week'); // 열 때마다 이번 주가 먼저
+    loadRanking();
+  }
 });
 
 document.getElementById('btn-grass').addEventListener('click', () => {
