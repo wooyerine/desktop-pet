@@ -563,13 +563,18 @@ async function macSwapUpdate(info) {
   }
 }
 
+// 44×24칸 도트 캔버스 하나라 GPU 가속이 필요 없다. 끄면 GPU 프로세스 메모리가
+// 약 30MB 줄고 유휴 CPU는 같다 (v1.10.3에서 실측)
+app.disableHardwareAcceleration();
+
 app.whenReady().then(() => {
   if (app.dock) app.dock.hide();
   loadSettings();
   createWindow();
   if (!process.env.SHOT) {
     createTray();
-    startInputHooks(); // 스크린샷 모드에선 전역 훅 불필요
+    // 스크린샷 모드에선 전역 훅 불필요. NO_HOOK=1은 개발 중 CPU 측정용 (권한 프롬프트 없이 실행)
+    if (!process.env.NO_HOOK) startInputHooks();
     if (app.isPackaged) setupAutoUpdate(); // 개발 실행에선 업데이트 확인 안 함
   }
 });

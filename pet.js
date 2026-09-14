@@ -16,8 +16,61 @@ let SCALE = 8;
 let HALF = 4;
 
 const canvas = document.getElementById('pet-canvas');
+const screenCtx = canvas.getContext('2d');
+/* 장면은 CPU 메모리에 있는 오프스크린 캔버스에 먼저 그린다 (willReadFrequently).
+ * 픽셀을 읽어 직전 프레임과 같으면 화면 캔버스를 건드리지 않는다 — 화면 캔버스에
+ * 그리기만 해도 컴포지터가 창을 다시 합성하므로, 투명 창에선 그게 GPU 비용의
+ * 대부분이다. 숨쉬기·깜빡임 같은 느린 애니메이션만 있는 유휴 상태에선
+ * 실제로 화면이 바뀌는 프레임이 초당 두세 장뿐이다 */
+const scene = document.createElement('canvas');
+
+/* 프레임이 바뀌었는지는 픽셀을 읽지 않고(getImageData는 프레임마다 버퍼를 새로
+ * 만들어 메모리를 키운다) 그리기 호출 열을 해시해서 판단한다. 같은 순서로 같은
+ * 인자를 그렸으면 결과도 같다. 해시는 정수 두 개뿐이라 할당이 없다 */
+let frameHash = 0;
+const nameHashes = new Map(); // 메서드/속성 이름 → 해시 (이름 종류는 몇 개 안 된다)
+function mix(v) { frameHash = Math.imul(frameHash ^ v, 16777619) >>> 0; }
+function strHash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+  return h;
+}
+function nameHash(p) {
+  let h = nameHashes.get(p);
+  if (h === undefined) { h = strHash(String(p)); nameHashes.set(p, h); }
+  return h;
+}
+function mixArg(a) {
+  if (typeof a === 'number') { mix(a | 0); mix((a * 4096) | 0); } // 소수 자리도 반영
+  else if (typeof a === 'string') mix(strHash(a));
+  else if (typeof a === 'boolean') mix(a ? 1 : 2);
+  else mix(7); // 캔버스 객체 등 — 종류만 반영
+}
+function trackedContext(real) {
+  const wrappers = new Map();
+  return new Proxy(real, {
+    get(t, p) {
+      const v = t[p];
+      if (typeof v !== 'function') return v;
+      let w = wrappers.get(p);
+      if (!w) {
+        const ph = nameHash(p);
+        w = function () {
+          mix(ph);
+          for (let i = 0; i < arguments.length; i++) mixArg(arguments[i]);
+          return v.apply(t, arguments);
+        };
+        wrappers.set(p, w);
+      }
+      return w;
+    },
+    set(t, p, val) { mix(nameHash(p)); mixArg(val); t[p] = val; return true; },
+  });
+}
+
 // 랭킹의 "친구 책상 구경" 미리보기가 잠깐 자기 캔버스로 바꿔 그린다
-let ctx = canvas.getContext('2d');
+let ctx = trackedContext(scene.getContext('2d'));
+let lastFrameHash = -1; // 직전에 화면에 올린 프레임의 해시
 
 /* ---------------- 팔레트 ---------------- */
 const PAL = {
@@ -1844,7 +1897,11 @@ function setPetSize(px) {
   HALF = SCALE / 2;
   canvas.width = SCENE_W * SCALE;
   canvas.height = SCENE_H * SCALE;
+  scene.width = canvas.width;
+  scene.height = canvas.height;
   ctx.imageSmoothingEnabled = false; // 캔버스 크기를 바꾸면 초기화된다
+  screenCtx.imageSmoothingEnabled = false;
+  lastFrameHash = -1; // 크기가 바뀌었으니 다음 프레임은 무조건 올린다
   // 말풍선 꼬리가 펫 머리 위에 오도록 CSS에서 쓰는 폭
   document.documentElement.style.setProperty('--pet-w', `${canvas.width}px`);
 }
@@ -2054,16 +2111,23 @@ function saveGame() {
   } catch (_) { /* 무시 */ }
 }
 
+// 매초 불리므로 값이 같으면 DOM을 건드리지 않는다 — textContent 대입은 같은
+// 문자열이어도 스타일 재계산을 일으킨다
+const hudLast = { level: '', xp: '', fill: '' };
 function updateHud() {
   const need = XP_PER_LEVEL(game.level);
-  hudLevel.textContent = `Lv.${game.level}`;
+  const level = `Lv.${game.level}`;
+  let xp;
   if (game.working) {
     const net = game.sessionXp >= 0 ? `+${game.sessionXp}` : `${game.sessionXp}`;
-    hudXp.textContent = game.away ? '☕ 자리 비움' : `💼 일하는 중 ${net}`;
+    xp = game.away ? '☕ 자리 비움' : `💼 일하는 중 ${net}`;
   } else {
-    hudXp.textContent = `${game.xp}/${need}`;
+    xp = `${game.xp}/${need}`;
   }
-  xpFill.style.width = `${Math.min(100, (game.xp / need) * 100)}%`;
+  const fill = `${Math.min(100, (game.xp / need) * 100)}%`;
+  if (level !== hudLast.level) { hudLevel.textContent = level; hudLast.level = level; }
+  if (xp !== hudLast.xp) { hudXp.textContent = xp; hudLast.xp = xp; }
+  if (fill !== hudLast.fill) { xpFill.style.width = fill; hudLast.fill = fill; }
 }
 
 function addXp(n) {
@@ -3067,15 +3131,30 @@ function drawVisitor(now) {
  * 발 콩콩이 키 입력마다 토글이라 낮은 fps에선 프레임 사이에 뭉개진다 */
 const FRAME_MS = 80;
 const FRAME_ACTIVE_MS = 33;
-let lastFrame = 0;
+
+/* requestAnimationFrame은 그릴 게 없어도 초당 60번 렌더러를 깨운다.
+ * 다음 프레임까지 필요한 만큼만 자고 일어나는 타이머로 돈다 */
+function isActive(now) {
+  return now - state.lastKey < 600 || now - state.lastMouse < 600 ||
+    now < state.celebrateUntil || now < state.sadUntil || !!visitor.kind;
+}
+
+function loop() {
+  const now = performance.now();
+  render(now);
+  setTimeout(loop, isActive(now) ? FRAME_ACTIVE_MS : FRAME_MS);
+}
+
+/* 이번 프레임의 그리기 열이 직전에 올린 것과 같으면 화면 캔버스를 건드리지 않는다 */
+function presentIfChanged() {
+  if (frameHash === lastFrameHash) return;
+  lastFrameHash = frameHash;
+  screenCtx.clearRect(0, 0, scene.width, scene.height);
+  screenCtx.drawImage(scene, 0, 0);
+}
 
 function render(now) {
-  requestAnimationFrame(render);
-  const active = now - state.lastKey < 600 || now - state.lastMouse < 600 ||
-    now < state.celebrateUntil || now < state.sadUntil || !!visitor.kind;
-  if (now - lastFrame < (active ? FRAME_ACTIVE_MS : FRAME_MS)) return;
-  lastFrame = now;
-
+  frameHash = 0;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   updateNag(now);
@@ -3197,8 +3276,10 @@ function render(now) {
   // 무드등 빛무리 — 밤 오버레이 위에 그려야 어둠을 뚫고 빛난다
   const di = DESK_ITEMS[deskItem];
   if (di.glow) di.glow(now, night);
+
+  presentIfChanged();
 }
-requestAnimationFrame(render);
+setTimeout(loop, 0); // 아래쪽 선언(timer 등)이 끝난 뒤 첫 프레임
 
 /* ---------------- 입력 이벤트 ---------------- */
 if (window.pet) {
