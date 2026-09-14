@@ -100,6 +100,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      // 다른 앱 뒤에 가려져도 타이머·렌더가 멈추지 않게 (점수 정산이 밀리지 않도록)
+      backgroundThrottling: false,
     },
   });
   applyOnTop(settings.onTop);

@@ -2354,12 +2354,18 @@ setInterval(() => {
   if (!game.working || game.away) return;
   maybeSpawnVisitor();
   const now = performance.now();
-  let delta = 0;
-  if (state.nagging) delta = -2;
-  else if (state.mode === 'sleeping') delta = -1;
+  // 창이 다른 앱 뒤에 완전히 가려지면 requestAnimationFrame(render)이 멈춰서
+  // state.mode / state.nagging이 마지막 값에 얼어붙는다. 잠자기·잔소리 상태로
+  // 얼어붙으면 타이핑해도 매초 감점이 됐다 — 정산은 여기서 직접 다시 계산한다
+  updateNag(now);
+  state.mode = currentMode(now);
   // 최근 10초 안에 키 3번 이상 — 한 번 톡 누르는 걸로는 점수가 유지되지 않고,
   // 생각하며 치는 진짜 타이핑 리듬은 끊기지 않는다
-  else if (state.keyRing.length === 3 && now - state.keyRing[0] < 10000) delta = 1;
+  const typing = state.keyRing.length === 3 && now - state.keyRing[0] < 10000;
+  let delta = 0;
+  if (typing) delta = 1;
+  else if (state.nagging) delta = -2;
+  else if (state.mode === 'sleeping') delta = -1;
   if (delta) {
     game.sessionXp += delta;
     addXp(delta);
