@@ -2071,12 +2071,14 @@ function thisWeekDays() {
 /* ================================================================
  * 레벨 / 일 세션 (다마고치처럼 키우기)
  *  - 일 시작 후 타이핑하면 +1/초, 잠들면 -1/초, 잔소리 뜨면 -2/초
+ *    (감점은 일 시작·마지막 키 입력 후 10분이 지나야 시작 — 0에서 출발하는 느낌)
  *  - 자리 비움 중엔 증감 없음, 일 끝 완주 보너스 / 뽀모도로 보너스
  * ================================================================ */
 const XP_PER_LEVEL = (lv) => lv * 1000; // 2000은 너무 더뎠다 — 방문객/꾸미기 해금 텀이 길어져서
 const WORK_BONUS = 50;
 const WORK_BONUS_MIN_MS = 10 * 60000; // 10분 이상 일해야 완주 보너스 (시작/끝 반복 어뷰징 방지)
 const POMODORO_BONUS = 100;
+const PENALTY_GRACE_MS = 10 * 60000; // 일 시작 후 10분은 키보드를 안 쳐도 감점 없음
 
 const game = {
   level: Math.max(1, +localStorage.getItem('petLevel') || 1),
@@ -2085,6 +2087,7 @@ const game = {
   away: false,
   sessionXp: 0,
   sessionStart: 0,
+  sessionStartPerf: 0, // performance.now() 기준 — 감점 유예 계산용
   demoted: false, // 이번 세션에서 강등됐는가 — 세션당 한 번만 떨어진다
 };
 
@@ -2426,10 +2429,14 @@ setInterval(() => {
   // 최근 10초 안에 키 3번 이상 — 한 번 톡 누르는 걸로는 점수가 유지되지 않고,
   // 생각하며 치는 진짜 타이핑 리듬은 끊기지 않는다
   const typing = state.keyRing.length === 3 && now - state.keyRing[0] < 10000;
+  // 일 시작 직후엔 0에서 시작하는 느낌이어야 한다 — 시작하고 10분(또는 마지막
+  // 키 입력 후 10분)이 지나기 전엔 잠들거나 잔소리가 떠도 감점하지 않는다
+  const sinceInput = now - Math.max(state.lastKey, game.sessionStartPerf);
+  const graceOver = sinceInput >= PENALTY_GRACE_MS;
   let delta = 0;
   if (typing) delta = 1;
-  else if (state.nagging) delta = -2;
-  else if (state.mode === 'sleeping') delta = -1;
+  else if (graceOver && state.nagging) delta = -2;
+  else if (graceOver && state.mode === 'sleeping') delta = -1;
   if (delta) {
     game.sessionXp += delta;
     addXp(delta);
@@ -3633,6 +3640,7 @@ btnWork.addEventListener('click', () => {
     game.away = false;
     game.sessionXp = 0;
     game.sessionStart = Date.now();
+    game.sessionStartPerf = performance.now();
     game.demoted = false;
     btnWork.innerHTML = '&#9209;';
     btnWork.title = '일 끝';
