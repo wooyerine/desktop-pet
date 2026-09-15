@@ -1883,6 +1883,7 @@ const state = {
   celebrateUntil: 0,
   sadUntil: 0,
   nagging: false,
+  locked: false, // 화면 잠금·잠자기 중 — 자리 비움처럼 정산을 멈춘다
   mode: 'idle',
 };
 
@@ -1951,7 +1952,7 @@ function updateNag(now) {
   const timerBusy = timer.running ||
     !bubble.classList.contains('hidden') || !bragEl.classList.contains('hidden');
   const show = DEMO === 'nag' ||
-    (!DEMO && !timerBusy && !game.away && idle >= NAG_AFTER);
+    (!DEMO && !timerBusy && !game.away && !state.locked && idle >= NAG_AFTER);
   if (show && nagEl.classList.contains('hidden')) {
     nagEl.textContent = NAG_MESSAGES[Math.floor(Math.random() * NAG_MESSAGES.length)];
   }
@@ -2123,7 +2124,9 @@ function updateHud() {
   let xp;
   if (game.working) {
     const net = game.sessionXp >= 0 ? `+${game.sessionXp}` : `${game.sessionXp}`;
-    xp = game.away ? '☕ 자리 비움' : `💼 일하는 중 ${net}`;
+    xp = game.away ? '☕ 자리 비움'
+      : state.locked ? '🔒 잠금 중'
+      : `💼 일하는 중 ${net}`;
   } else {
     xp = `${game.xp}/${need}`;
   }
@@ -2418,7 +2421,7 @@ setInterval(() => {
     saveStats();
     checkAchievements();
   }
-  if (!game.working || game.away) return;
+  if (!game.working || game.away || state.locked) return;
   maybeSpawnVisitor();
   const now = performance.now();
   // 창이 다른 앱 뒤에 완전히 가려지면 requestAnimationFrame(render)이 멈춰서
@@ -3307,6 +3310,16 @@ if (window.pet) {
       state.lastMouse = now;
     }
   });
+
+  // 화면 잠금·잠자기 — 자리 비움처럼 정산이 멈춘다. 풀리면 방금 돌아온 것으로
+  // 쳐서(lastKey 갱신) 잔소리·감점 유예가 다시 10분부터 시작한다
+  if (window.pet.onScreenLock) {
+    window.pet.onScreenLock((locked) => {
+      state.locked = locked;
+      if (!locked) state.lastKey = performance.now();
+      updateHud();
+    });
+  }
 
   // 업데이트 다운로드 진행률 — 완료 창이 뜰 때까지 토스트로 보여 준다
   if (window.pet.onUpdateProgress) {

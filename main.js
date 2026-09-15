@@ -577,7 +577,21 @@ app.whenReady().then(() => {
     if (!process.env.NO_HOOK) startInputHooks();
     if (app.isPackaged) setupAutoUpdate(); // 개발 실행에선 업데이트 확인 안 함
   }
+  watchScreenLock();
 });
+
+/* 화면 잠금·잠자기 — 자리를 비운 것이니 렌더러에 알려 일 세션 정산을 멈춘다.
+ * (창이 가려져도 정산은 계속되도록 고친 뒤로, 잠금 중에도 감점이 쌓였다) */
+function watchScreenLock() {
+  const { powerMonitor } = require('electron');
+  const sendLock = (locked) => {
+    if (win && !win.isDestroyed()) win.webContents.send('screen-lock', locked);
+  };
+  powerMonitor.on('lock-screen', () => sendLock(true));
+  powerMonitor.on('suspend', () => sendLock(true));
+  powerMonitor.on('unlock-screen', () => sendLock(false));
+  powerMonitor.on('resume', () => sendLock(false));
+}
 
 /* 종료 — uiohook.stop()은 부르면 안 된다: macOS 26에서 훅 스레드
  * join을 기다리며 메인 스레드가 영영 멈춘다 (종료가 안 끝나 좀비
