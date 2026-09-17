@@ -33,11 +33,29 @@ function assertDepsPacked(context) {
   console.log(`  • 포장 검사 통과: ${deps.join(', ')} 모두 app.asar에 있음`);
 }
 
+const SIGNING_IDENTITY = 'Desktop Pet Signing';
+function findSigningIdentity() {
+  if (process.env.ADHOC_SIGN) return null; // 강제로 ad-hoc 서명하고 싶을 때
+  try {
+    const out = execSync('security find-identity -v -p codesigning', { encoding: 'utf8' });
+    return out.includes(`"${SIGNING_IDENTITY}"`) ? SIGNING_IDENTITY : null;
+  } catch {
+    return null;
+  }
+}
+
 exports.default = async function afterPack(context) {
   assertDepsPacked(context);
   if (context.electronPlatformName !== 'darwin') return;
   const appPath = `${context.appOutDir}/${context.packager.appInfo.productFilename}.app`;
-  execSync(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
+  // 키체인에 "Desktop Pet Signing" 자체 서명 인증서가 있으면 그걸로 서명한다.
+  // ad-hoc(-)은 신원이 빌드마다 바뀌는 cdhash라 업데이트마다 손쉬운 사용 권한이
+  // 풀린다. 인증서로 서명하면 신원이 "번들 ID + 인증서"로 고정돼 권한이 유지된다.
+  const identity = findSigningIdentity();
+  console.log(identity
+    ? `  • 서명: ${identity} (업데이트해도 권한 유지)`
+    : '  • 서명: ad-hoc — 업데이트마다 손쉬운 사용 권한이 풀린다 (README 개발자 가이드 참고)');
+  execSync(`codesign --force --deep --sign "${identity || '-'}" "${appPath}"`, { stdio: 'inherit' });
   execSync(`codesign --verify --deep --strict "${appPath}"`, { stdio: 'inherit' });
 };
 
