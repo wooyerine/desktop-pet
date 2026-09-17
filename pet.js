@@ -4056,6 +4056,7 @@ function drawRoamPet(now, moving) {
 
 const FRAME_MS = 80;
 const FRAME_ACTIVE_MS = 33;
+const FRAME_ROAM_MS = 50; // 돌아다닐 땐 캔버스가 화면 폭이라 20fps면 충분 — 위치가 반 칸 단위라 차이가 안 보인다
 
 /* requestAnimationFrame은 그릴 게 없어도 초당 60번 렌더러를 깨운다.
  * 다음 프레임까지 필요한 만큼만 자고 일어나는 타이머로 돈다 */
@@ -4067,7 +4068,7 @@ function isActive(now) {
 function loop() {
   const now = performance.now();
   render(now);
-  setTimeout(loop, isActive(now) ? FRAME_ACTIVE_MS : FRAME_MS);
+  setTimeout(loop, roam.active ? FRAME_ROAM_MS : isActive(now) ? FRAME_ACTIVE_MS : FRAME_MS);
 }
 
 /* 이번 프레임의 그리기 열이 직전에 올린 것과 같으면 화면 캔버스를 건드리지 않는다 */
