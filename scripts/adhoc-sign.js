@@ -3,8 +3,9 @@
 //     electron-builder는 node_modules에 없는 의존성을 에러 없이 그냥 빼고 포장한다.
 //     v1.10.0이 그렇게 electron-updater 없이 나가서 모든 사용자의 자동 업데이트가
 //     막혔다 ("Cannot find module 'electron-updater'"). 빌드 단계에서 잡아 실패시킨다.
-//  2) macOS ad-hoc 서명 — 서명이 아예 깨진 채 배포되면 macOS가
-//     "손상되어 열 수 없다"며 실행을 거부한다. ad-hoc이라도 일관된 서명을 입힌다.
+//  2) macOS 서명 — 키체인의 "Desktop Pet Signing" 인증서로 서명한다. 없으면 빌드를
+//     멈춘다 (ADHOC_SIGN=1이면 ad-hoc으로 — 서명이 아예 없으면 macOS가 "손상되어
+//     열 수 없다"며 실행을 거부한다).
 const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -52,6 +53,15 @@ exports.default = async function afterPack(context) {
   // ad-hoc(-)은 신원이 빌드마다 바뀌는 cdhash라 업데이트마다 손쉬운 사용 권한이
   // 풀린다. 인증서로 서명하면 신원이 "번들 ID + 인증서"로 고정돼 권한이 유지된다.
   const identity = findSigningIdentity();
+  // 인증서 없는 PC에서 조용히 ad-hoc으로 넘어가면 그대로 릴리즈돼 모든 사용자의 권한이
+  // 풀린다 (v2.1.3~v2.2.1이 그렇게 나갔다). 일부러 ad-hoc으로 만들 때만 ADHOC_SIGN=1
+  if (!identity && !process.env.ADHOC_SIGN) {
+    throw new Error(
+      `키체인에 "${SIGNING_IDENTITY}" 인증서가 없다 — 이대로 릴리즈하면 업데이트마다 손쉬운 사용 ` +
+      '권한이 풀린다. 원래 PC에서 .p12로 내보내 로그인 키체인에 가져오고 코드 서명을 "항상 신뢰"로 ' +
+      '둘 것. 배포하지 않을 빌드라면 ADHOC_SIGN=1로 실행'
+    );
+  }
   console.log(identity
     ? `  • 서명: ${identity} (업데이트해도 권한 유지)`
     : '  • 서명: ad-hoc — 업데이트마다 손쉬운 사용 권한이 풀린다 (README 개발자 가이드 참고)');
