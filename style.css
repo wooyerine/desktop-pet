@@ -121,6 +121,12 @@ html, body {
   filter: drop-shadow(0 0 3px rgba(58, 42, 30, 0.3));
 }
 
+/* 돌아다니는 동안은 캔버스만 — 창이 화면 폭이라 버튼·HUD·말풍선을 숨긴다 */
+.roaming #app { padding: 0; }
+.roaming #app > :not(#pet-canvas) { display: none !important; }
+/* 화면 크기 캔버스에 그림자 필터를 걸면 GPU가 매 프레임 화면 전체를 흐린다 */
+.roaming #pet-canvas { -webkit-app-region: no-drag; cursor: default; filter: none; }
+
 /* ---- 하단 버튼 바 ---- */
 #bar {
   -webkit-app-region: no-drag;

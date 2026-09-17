@@ -44,8 +44,50 @@ function winWidth(petPx) {
   return Math.max(MIN_WIN_W, SCENE_W * petPx + 20);
 }
 
+/* ---- 돌아다니기 ----
+ * 렌더러가 요청하면 창을 그 화면의 작업 영역 전체로 넓히고 클릭이 통과되게
+ * 한다. 책상이 있던 자리를 알려 주면 렌더러가 그 자리에 책상을 그대로 그린다.
+ * 끝나면 원래 창 위치로 되돌린다 */
+let roamHome = null; // 넓히기 전 창 위치 — 있으면 돌아다니는 중
+const APP_PAD_TOP = 8; // style.css #app padding-top — 캔버스가 창 위에서 떨어진 만큼
+
+/* 창 크기를 바꾸는 사이 렌더러가 아직 이전 화면을 그리고 있으면 엉뚱한 자리에
+ * 한 프레임 보인다. 바꾸는 동안 창을 투명하게 두고, 렌더러가 새 화면을 한 번
+ * 그린 뒤 'roam-ready'를 보내면 다시 보이게 한다 */
+function startRoam() {
+  if (roamHome || !win || win.isDestroyed()) return;
+  const home = win.getBounds();
+  const area = screen.getDisplayMatching(home).workArea;
+  const canvasW = SCENE_W * settings.petPx;
+  const bottom = area.y + area.height;
+  const y = Math.min(home.y, bottom - 1);
+  roamHome = home;
+  hideForRoamSwap();
+  win.setIgnoreMouseEvents(true, { forward: true });
+  // 책상 위치부터 화면 바닥까지 — 펫은 바닥선을 따라 걷는다
+  win.setBounds({ x: area.x, y, width: area.width, height: bottom - y });
+  win.webContents.send('roam', {
+    widthPx: area.width,
+    heightPx: bottom - y,
+    // 캔버스는 창 가운데 — 책상이 있던 화면 좌표를 넓힌 캔버스 안의 좌표로
+    homePx: home.x - area.x + Math.round((home.width - canvasW) / 2),
+    homeY: home.y - y + APP_PAD_TOP,
+  });
+}
+
+function endRoam() {
+  if (!roamHome || !win || win.isDestroyed()) return;
+  const home = roamHome;
+  roamHome = null;
+  hideForRoamSwap();
+  win.setIgnoreMouseEvents(false);
+  win.setBounds(home);
+  win.webContents.send('roam', null);
+}
+
 /* 펫 크기를 바꾸고 창 폭을 맞춘다. 높이는 렌더러가 재서 'fit'으로 알려준다 */
 function applyPetSize(petPx) {
+  endRoam();
   settings.petPx = petPx;
   win.webContents.send('pet-size', petPx);
   setWindowSize(winWidth(petPx), win.getBounds().height);
@@ -112,6 +154,7 @@ function createWindow() {
   if (process.env.PANEL) q.push(`panel=${process.env.PANEL}`);
   if (process.env.PET) q.push(`pet=${process.env.PET}`);
   if (process.env.NIGHT) q.push(`night=${process.env.NIGHT}`);
+  if (process.env.ROAM) q.push(`roam=${process.env.ROAM}`);
   if (process.env.VISITOR) q.push(`visitor=${process.env.VISITOR}`);
   if (process.env.DESK) q.push(`desk=${process.env.DESK}`);
   if (process.env.ACC) q.push(`acc=${process.env.ACC}`);
@@ -125,11 +168,18 @@ function createWindow() {
 
   if (process.env.SHOT) {
     win.webContents.once('did-finish-load', () => {
+      // SHOT_N장을 SHOT_EVERY ms 간격으로 (파일명에 #을 번호로) — 움직임 확인용
+      const n = +process.env.SHOT_N || 1;
+      const every = +process.env.SHOT_EVERY || 500;
       setTimeout(async () => {
-        const img = await win.webContents.capturePage();
-        require('fs').writeFileSync(process.env.SHOT, img.toPNG());
+        for (let i = 0; i < n; i++) {
+          const img = await win.webContents.capturePage();
+          const name = process.env.SHOT.replace('#', String(i).padStart(2, '0'));
+          require('fs').writeFileSync(name, img.toPNG());
+          if (i < n - 1) await new Promise((r) => setTimeout(r, every));
+        }
         app.quit();
-      }, 1200);
+      }, +process.env.SHOT_MS || 1200);
     });
   }
 }
@@ -252,6 +302,7 @@ function showManual() {
 }
 
 function moveToCorner() {
+  endRoam();
   const { width, height } = win.getBounds();
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   win.setBounds({
@@ -614,9 +665,25 @@ ipcMain.handle('status', () => ({ accessibilityOK, platform: process.platform })
 // 남는 투명 영역이 없어야 그 자리의 다른 앱을 클릭할 수 있다
 ipcMain.on('fit', (_e, height) => {
   if (!win || win.isDestroyed()) return;
-  if (!Number.isFinite(height)) return;
+  if (!Number.isFinite(height) || roamHome) return; // 돌아다니는 중엔 창이 화면 크기
   setWindowSize(winWidth(settings.petPx), clamp(Math.ceil(height), 80, 1400));
 });
+
+ipcMain.on('roam', (_e, on) => (on ? startRoam() : endRoam()));
+ipcMain.on('roam-ready', showAfterRoamSwap);
+
+/* 렌더러가 새 화면을 그렸다고 알리면 다시 보이게. 혹시 신호가 안 와도
+ * 창이 투명한 채로 남지 않게 잠시 뒤엔 무조건 보이게 한다 */
+let roamShowTimer = null;
+function showAfterRoamSwap() {
+  clearTimeout(roamShowTimer);
+  if (win && !win.isDestroyed()) win.setOpacity(1);
+}
+function hideForRoamSwap() {
+  win.setOpacity(0);
+  clearTimeout(roamShowTimer);
+  roamShowTimer = setTimeout(showAfterRoamSwap, 400);
+}
 
 ipcMain.on('notify', (_e, { title, body }) => {
   new Notification({ title, body }).show();

@@ -536,9 +536,590 @@ const PET_DEFS = {
   },
 };
 
+/* 서 있을 때의 정면 (돌아다니다 멈춰 이쪽을 볼 때) — 앉은 스프라이트는 책상
+ * 뒤에서 뚝 잘리므로, 몸을 두 줄 더 이어 아래를 둥글게 마무리하고 그 앞에
+ * 발을 놓는다. 해달은 앉은 자세가 일부러 비스듬해서 몸만 곧게 다시 그린다 */
+function standSprite(sil, paint, base) {
+  const last = sil[sil.length - 1];
+  const shrink = (n) => last.map(([a, b]) => [a + n, b - n]);
+  return buildSprite([...sil, shrink(1), shrink(2)], paint, base);
+}
+PET_DEFS.cat.stand = standSprite(CAT_SIL, CAT_PAINT, 'o');
+PET_DEFS.dog.stand = standSprite(DOG_SIL, DOG_PAINT, 'b');
+PET_DEFS.rabbit.stand = standSprite(RABBIT_SIL, RABBIT_PAINT, 'w');
+PET_DEFS.hamster.stand = standSprite(HAMSTER_SIL, HAMSTER_PAINT, 'n');
+
+const OTTER_STAND_SIL = [
+  ...OTTER_SIL.slice(0, 10),
+  [[1, 14]], [[1, 14]], [[1, 14]], [[1, 14]], [[2, 13]], [[2, 13]],
+];
+const OTTER_STAND_PAINT = [
+  ...OTTER_PAINT.filter(([r]) => r < 9),
+  [9, 6, 9, 'i'],                             // 목 크림
+  [10, 4, 11, 'i'], [11, 3, 12, 'i'], [12, 3, 12, 'i'], [13, 3, 12, 'i'],
+  [14, 4, 11, 'i'], [15, 5, 10, 'i'], [16, 6, 9, 'i'], // 크림 배
+  [10, 1, 1, 'J'], [10, 14, 14, 'J'], [11, 1, 1, 'J'], [11, 14, 14, 'J'],
+  [12, 1, 1, 'J'], [12, 14, 14, 'J'],          // 옆구리 그늘
+];
+PET_DEFS.otter.stand = standSprite(OTTER_STAND_SIL, OTTER_STAND_PAINT, 'j');
+
 const PET_ORDER = ['cat', 'dog', 'rabbit', 'hamster', 'otter'];
 
-// 점 눈 (2x2)
+/* ---------------- 옆모습 (돌아다닐 때) ----------------
+ * 오른쪽을 보는 실루엣만 그리고 왼쪽은 좌우 반전. 다리는 실루엣에 없고
+ * 걸음 위상에 따라 프로그램으로 붙인다. gait: walk(네 발 엇갈려) /
+ * hop(토끼 — 뛰어오를 땐 다리를 오므린다) / waddle(해달 — 두 발로 뒤뚱).
+ * 그림은 참고 이미지처럼 단순하게: 굵은 테두리 + 단색 몸 + 볼터치 + 배 한 덩이 */
+const SIDE_DEFS = {
+  cat: {
+    base: 'o', gait: 'walk',
+    sil: [
+      [[12, 13], [21, 22]],            // 귀 끝
+      [[11, 14], [20, 23]],
+      [[11, 23]],                      // 정수리
+      [[10, 24]],
+      [[10, 25]],
+      [[0, 0], [9, 25]],               // 꼬리 끝 / 볼 털
+      [[0, 1], [9, 25]],
+      [[1, 1], [9, 25]],
+      [[1, 2], [10, 24]],              // 턱
+      [[2, 23]],                       // 등
+      [[2, 22]],
+      [[2, 21]],
+      [[2, 21]],
+      [[3, 20]],
+      [[3, 20]],
+      [[4, 19]],                       // 배
+    ],
+    paint: [
+      [1, 12, 13, 'O'], [1, 21, 22, 'O'],     // 귀 속
+      [7, 22, 23, 'p'],                        // 볼터치
+      [13, 6, 17, 'c'], [14, 5, 18, 'c'], [15, 6, 17, 'c'], // 배
+    ],
+    eye: { x: 19, y: 4 }, nose: { x: 25, y: 6, c: 'k' },
+    legs: { y: 16, xs: [4, 8, 13, 17], h: 3, toe: 'c' },
+  },
+  dog: {
+    base: 'b', gait: 'walk',
+    sil: [
+      [[13, 22]],                      // 둥근 정수리
+      [[12, 23]],
+      [[11, 24]],
+      [[10, 25]],
+      [[10, 25]],
+      [[1, 2], [10, 25]],              // 꼬리 (위로 쫑긋)
+      [[1, 2], [10, 25]],
+      [[2, 3], [10, 25]],
+      [[2, 3], [11, 24]],
+      [[3, 23]],
+      [[2, 22]],
+      [[2, 21]],
+      [[2, 21]],
+      [[3, 20]],
+      [[3, 20]],
+      [[4, 19]],
+    ],
+    paint: [
+      [3, 10, 12, 'e'], [4, 10, 12, 'e'], [5, 10, 12, 'e'],
+      [6, 10, 12, 'e'], [7, 10, 12, 'e'], [8, 11, 12, 'e'], // 처진 귀
+      [5, 21, 25, 'f'], [6, 20, 25, 'f'], [7, 20, 25, 'f'], [8, 21, 24, 'f'], // 주둥이
+      [7, 22, 23, 'p'],                        // 볼터치
+      [13, 6, 17, 'f'], [14, 5, 18, 'f'], [15, 6, 17, 'f'], // 크림 배
+    ],
+    eye: { x: 19, y: 3 }, nose: { x: 25, y: 5, c: 'k' },
+    legs: { y: 16, xs: [4, 8, 13, 17], h: 3, toe: 'f' },
+  },
+  rabbit: {
+    base: 'w', gait: 'hop',
+    sil: [
+      [[14, 15], [19, 20]],            // 긴 귀
+      [[13, 16], [18, 21]],
+      [[13, 16], [18, 21]],
+      [[13, 16], [18, 21]],
+      [[12, 22]],                      // 정수리
+      [[11, 24]],
+      [[10, 25]],
+      [[10, 25]],
+      [[10, 25]],
+      [[10, 25]],
+      [[10, 25]],
+      [[1, 3], [11, 24]],              // 동그란 꼬리 / 턱
+      [[1, 23]],
+      [[1, 22]],
+      [[2, 21]],
+      [[2, 21]],
+      [[3, 20]],
+      [[4, 19]],
+    ],
+    paint: [
+      [1, 14, 15, 'p'], [2, 14, 15, 'p'], [3, 14, 15, 'p'],
+      [1, 19, 20, 'p'], [2, 19, 20, 'p'], [3, 19, 20, 'p'],  // 귀 속
+      [9, 22, 23, 'p'],                        // 볼터치
+      [15, 6, 17, 'u'], [16, 5, 18, 'u'], [17, 6, 17, 'u'], // 배 그늘
+    ],
+    eye: { x: 19, y: 7 }, nose: { x: 25, y: 8, c: 'p' },
+    legs: { y: 18, xs: [4, 8, 13, 17], h: 3, toe: 'u' },
+  },
+  hamster: {
+    base: 'n', gait: 'walk',
+    sil: [
+      [[13, 14], [20, 21]],            // 작은 귀
+      [[12, 23]],
+      [[11, 24]],
+      [[10, 25]],
+      [[10, 25]],
+      [[10, 25]],
+      [[10, 25]],
+      [[10, 25]],
+      [[11, 24]],
+      [[3, 23]],                       // 통통한 등
+      [[2, 22]],
+      [[2, 22]],
+      [[2, 22]],
+      [[2, 21]],
+      [[3, 20]],
+      [[4, 19]],
+    ],
+    paint: [
+      [0, 13, 13, 'w'],                        // 귀 속
+      [5, 18, 25, 'w'], [6, 17, 25, 'w'], [7, 17, 25, 'w'], [8, 18, 24, 'w'], // 흰 얼굴
+      [7, 22, 23, 'p'],                        // 볼터치
+      [12, 5, 19, 'w'], [13, 4, 19, 'w'], [14, 5, 18, 'w'], [15, 6, 17, 'w'], // 흰 배
+    ],
+    eye: { x: 19, y: 3 }, nose: { x: 25, y: 5, c: 'k' },
+    legs: { y: 16, xs: [5, 9, 13, 17], h: 2, toe: 'p' },
+  },
+  otter: {
+    // 두 발로 서서 뒤뚱뒤뚱 — 꼬리는 바닥에 끌린다
+    base: 'j', gait: 'waddle',
+    sil: [
+      [[10, 11], [18, 19]],            // 귀 나부랭이
+      [[9, 20]],
+      [[8, 21]],
+      [[7, 22]],
+      [[7, 22]],
+      [[7, 22]],
+      [[7, 22]],
+      [[8, 21]],
+      [[8, 21]],
+      [[9, 20]],                       // 목
+      [[9, 20]],                       // 몸통 — 머리보다 홀쭉하게
+      [[8, 21]],
+      [[8, 21]],
+      [[8, 21]],
+      [[8, 21]],
+      [[2, 21]],                       // 꼬리가 뒤로
+      [[0, 21]],
+      [[0, 20]],
+    ],
+    paint: [
+      [0, 10, 10, 'J'], [0, 19, 19, 'J'],      // 귀 속
+      [4, 13, 22, 'i'], [5, 12, 22, 'i'], [6, 12, 22, 'i'],
+      [7, 13, 21, 'i'], [8, 14, 20, 'i'],      // 크림 아랫얼굴
+      [6, 20, 21, 'p'],                        // 볼터치
+      [11, 12, 18, 'i'], [12, 11, 19, 'i'], [13, 11, 19, 'i'], [14, 12, 18, 'i'], // 크림 배
+      [16, 0, 3, 'J'], [17, 0, 3, 'J'],        // 꼬리 끝 그늘
+    ],
+    eye: { x: 17, y: 3 }, nose: { x: 22, y: 5, c: 'k' },
+    arm: { x: 22, y: 11, w: 3, h: 2, c: 'J' }, // 몸 앞으로 튀어나온 조그만 팔 — 걸으면 까딱까딱
+    legs: { y: 18, xs: [9, 15], h: 3, toe: 'J' },
+  },
+};
+const SIDE_W = 28; // 테두리 포함 폭
+
+/* ---------------- 발라당 (등을 바닥에 대고 배 보이기) ----------------
+ * 머리는 왼쪽에서 이쪽을 보고, 앞발은 가슴에 모으고, 뒷발은 위로 들어
+ * 발버둥, 꼬리는 오른쪽으로. 뒷발만 두 위상으로 갈아 끼운다.
+ * 왼쪽을 보던 중이면 좌우 반전 */
+const FLOP_DEFS = {
+  cat: {
+    base: 'o',
+    sil: [
+      [],
+      [[3, 4], [8, 9]],                       // 귀
+      [[2, 10]],
+      [[1, 11], [13, 14]],                    // 머리 / 앞발 하나
+      [[1, 11], [12, 15], [18, 20]],          // 앞발 둘 / 엉덩이
+      [[0, 25]],
+      [[0, 25]],
+      [[0, 25]],
+      [[1, 25]],
+      [[1, 26]],                              // 꼬리
+      [[2, 27]],
+      [[3, 27]],
+      [[10, 24]],                             // 등이 닿는 바닥
+    ],
+    leg: [
+      [[0, 22, 23], [1, 21, 24], [2, 21, 24], [3, 20, 24]],   // 뒷발 위로
+      [[1, 23, 25], [2, 22, 25], [3, 21, 24]],                // 발버둥
+    ],
+    paint: [
+      [1, 3, 3, 'O'], [1, 9, 9, 'O'],                         // 귀 속
+      [7, 9, 10, 'p'],                                        // 볼터치
+      [4, 12, 12, 'c'], [4, 15, 15, 'c'],                     // 앞발 발끝
+      [6, 15, 21, 'c'], [7, 14, 22, 'c'], [8, 13, 23, 'c'],
+      [9, 13, 23, 'c'], [10, 14, 22, 'c'], [11, 16, 20, 'c'], // 배
+      [5, 11, 11, 'O'], [6, 11, 11, 'O'], [7, 11, 11, 'O'], [8, 11, 11, 'O'], // 목 그늘
+    ],
+    eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'k' },
+  },
+  dog: {
+    base: 'b',
+    sil: [
+      [],
+      [[3, 9]],                               // 둥근 정수리
+      [[2, 10]],
+      [[1, 11], [13, 14]],
+      [[1, 11], [12, 15], [18, 20]],
+      [[0, 25]],
+      [[0, 25]],
+      [[0, 25]],
+      [[1, 25]],
+      [[1, 25]],                              // 짧은 꼬리
+      [[2, 26]],
+      [[3, 26]],
+      [[10, 24]],
+    ],
+    leg: [
+      [[0, 22, 23], [1, 21, 24], [2, 21, 24], [3, 20, 24]],
+      [[1, 23, 25], [2, 22, 25], [3, 21, 24]],
+    ],
+    paint: [
+      [2, 2, 3, 'e'], [3, 1, 2, 'e'], [4, 1, 2, 'e'], [5, 0, 1, 'e'],
+      [6, 0, 1, 'e'], [7, 0, 1, 'e'],                         // 처진 귀
+      [7, 3, 8, 'f'], [8, 3, 8, 'f'],                         // 주둥이
+      [7, 9, 10, 'p'],                                        // 볼터치
+      [4, 12, 12, 'f'], [4, 15, 15, 'f'],
+      [6, 15, 21, 'f'], [7, 14, 22, 'f'], [8, 13, 23, 'f'],
+      [9, 13, 23, 'f'], [10, 14, 22, 'f'], [11, 16, 20, 'f'], // 크림 배
+      [5, 11, 11, 'e'], [6, 11, 11, 'e'], [7, 11, 11, 'e'], [8, 11, 11, 'e'], // 목 그늘
+    ],
+    eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'k' },
+  },
+  rabbit: {
+    base: 'w',
+    sil: [
+      [[2, 3], [6, 7]],                       // 긴 귀
+      [[2, 3], [6, 7]],
+      [[1, 10]],
+      [[1, 11], [13, 14]],
+      [[1, 11], [12, 15], [18, 20]],
+      [[0, 25]],
+      [[0, 25]],
+      [[0, 25]],
+      [[1, 25]],
+      [[1, 24]],
+      [[2, 24], [25, 27]],                    // 동그란 꼬리
+      [[3, 27]],
+      [[10, 24]],
+    ],
+    leg: [
+      [[0, 22, 23], [1, 21, 24], [2, 21, 24], [3, 20, 24]],
+      [[1, 23, 25], [2, 22, 25], [3, 21, 24]],
+    ],
+    paint: [
+      [0, 3, 3, 'p'], [1, 3, 3, 'p'], [0, 7, 7, 'p'], [1, 7, 7, 'p'], // 귀 속
+      [7, 9, 10, 'p'],
+      [4, 12, 12, 'u'], [4, 15, 15, 'u'],
+      [6, 15, 21, 'u'], [7, 14, 22, 'u'], [8, 13, 23, 'u'],
+      [9, 13, 23, 'u'], [10, 14, 22, 'u'], [11, 16, 20, 'u'],
+      [5, 11, 11, 'u'], [6, 11, 11, 'u'], [7, 11, 11, 'u'], [8, 11, 11, 'u'], // 목 그늘
+    ],
+    eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'p' },
+  },
+  hamster: {
+    base: 'n',
+    sil: [
+      [],
+      [[3, 3], [9, 9]],                       // 작은 귀
+      [[2, 10]],
+      [[1, 11], [13, 14]],
+      [[1, 11], [12, 15], [18, 20]],
+      [[0, 25]],
+      [[0, 25]],
+      [[0, 25]],
+      [[1, 25]],
+      [[1, 24]],
+      [[2, 24]],
+      [[3, 24]],
+      [[10, 24]],
+    ],
+    leg: [
+      [[0, 22, 23], [1, 21, 24], [2, 21, 24], [3, 20, 24]],
+      [[1, 23, 25], [2, 22, 25], [3, 21, 24]],
+    ],
+    paint: [
+      [1, 3, 3, 'w'],                                         // 귀 속
+      [7, 1, 10, 'w'], [8, 1, 10, 'w'], [9, 2, 9, 'w'],       // 흰 얼굴
+      [7, 9, 10, 'p'],
+      [4, 12, 12, 'p'], [4, 15, 15, 'p'],                     // 분홍 발
+      [5, 14, 22, 'w'], [6, 13, 23, 'w'], [7, 12, 24, 'w'], [8, 12, 24, 'w'],
+      [9, 12, 24, 'w'], [10, 13, 23, 'w'], [11, 15, 21, 'w'], // 흰 배
+      [5, 11, 11, 'N'], [6, 11, 11, 'N'], [7, 11, 11, 'N'], [8, 11, 11, 'N'], // 목 그늘
+    ],
+    eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'k' },
+  },
+  otter: {
+    base: 'j',
+    sil: [
+      [],
+      [[3, 3], [9, 9]],
+      [[2, 10]],
+      [[1, 11], [13, 14]],
+      [[1, 11], [12, 15], [18, 20]],
+      [[0, 25]],
+      [[0, 26]],
+      [[0, 27]],                              // 두꺼운 꼬리
+      [[1, 27]],
+      [[1, 27]],
+      [[2, 27]],
+      [[3, 26]],
+      [[10, 25]],
+    ],
+    leg: [
+      [[0, 22, 23], [1, 21, 24], [2, 21, 24], [3, 20, 24]],
+      [[1, 23, 25], [2, 22, 25], [3, 21, 24]],
+    ],
+    paint: [
+      [1, 3, 3, 'J'], [1, 9, 9, 'J'],
+      [6, 1, 10, 'i'], [7, 1, 10, 'i'], [8, 2, 9, 'i'], [9, 3, 8, 'i'], // 크림 얼굴
+      [7, 9, 10, 'p'],
+      [4, 12, 12, 'J'], [4, 15, 15, 'J'],
+      [5, 14, 21, 'i'], [6, 13, 22, 'i'], [7, 12, 23, 'i'], [8, 12, 23, 'i'],
+      [9, 12, 23, 'i'], [10, 13, 22, 'i'], [11, 15, 20, 'i'], // 크림 배
+      [7, 25, 27, 'J'], [8, 25, 27, 'J'], [9, 25, 27, 'J'], [10, 25, 27, 'J'], // 꼬리
+      [5, 11, 11, 'J'], [6, 11, 11, 'J'], [7, 11, 11, 'J'], [8, 11, 11, 'J'], // 목 그늘
+    ],
+    eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'k' },
+  },
+};
+
+const flopCache = new Map();
+function flopSprite(kind, dir, phase) {
+  const key = `${kind}/${dir}/${phase}`;
+  let g = flopCache.get(key);
+  if (g) return g;
+  const D = FLOP_DEFS[kind];
+  const sil = D.sil.map((r) => r.slice());
+  const paint = D.paint.slice();
+  for (const [r, a, b] of D.leg[phase]) sil[r].push([a, b]);
+  for (const ex of [D.eyes.lx, D.eyes.rx]) {
+    paint.push([D.eyes.y, ex, ex + 1, 'k'], [D.eyes.y + 1, ex, ex + 1, 'k']);
+  }
+  paint.push([D.nose.y, D.nose.x, D.nose.x + D.nose.w - 1, D.nose.c]);
+  g = buildSprite(sil, paint, D.base, 30);
+  if (dir < 0) g = g.map((row) => row.split('').reverse().join(''));
+  flopCache.set(key, g);
+  return g;
+}
+
+
+
+/* ---------------- 기지개 (앞발 쭉, 가슴 낮게, 엉덩이 높이) ----------------
+ * 오른쪽을 본다. 앞발은 바닥에 붙여 앞으로 뻗고, 뒷다리는 서 있고, 등은
+ * 엉덩이에서 머리로 내려오는 사선. 두 위상: 앞발을 조금 더 밀어낸다 */
+const STRETCH_DEFS = {
+  cat: {
+    base: 'o',
+    sil: [
+      [[1, 2]],                               // 꼬리 끝
+      [[0, 2]],
+      [[0, 1], [4, 9]],                       // 꼬리 / 엉덩이
+      [[3, 11]],
+      [[2, 12]],
+      [[2, 13]],
+      [[2, 14]],
+      [[2, 15]],                              // 등 사선
+      [[3, 16], [19, 20], [23, 24]],          // 귀
+      [[3, 17], [18, 25]],
+      [[3, 26]],
+      [[4, 26]],
+      [[4, 26]],
+      [[4, 25]],                              // 낮춘 가슴
+      [[3, 5], [7, 9], [15, 26]],             // 뒷다리 / 앞발 쭉
+      [[3, 5], [7, 9], [15, 26]],
+    ],
+    front: [[14, 15, 27], [15, 15, 27]],      // 위상 1: 앞발 한 칸 더
+    paint: [
+      [8, 19, 19, 'O'], [8, 24, 24, 'O'],     // 귀 속
+      [11, 23, 26, 'c'], [12, 23, 26, 'c'],   // 주둥이
+      [12, 24, 25, 'p'],                      // 볼터치
+      [12, 9, 16, 'c'], [13, 8, 17, 'c'],     // 배
+      [15, 25, 26, 'c'],                      // 앞발 발끝
+    ],
+    eye: { x: 22, y: 10 }, nose: { x: 26, y: 12, c: 'k' },
+  },
+  dog: {
+    base: 'b',
+    sil: [
+      [],
+      [[1, 2]],                               // 짧은 꼬리
+      [[1, 2], [4, 9]],
+      [[3, 11]],
+      [[2, 12]],
+      [[2, 13]],
+      [[2, 14]],
+      [[2, 15]],
+      [[3, 16], [19, 24]],                    // 둥근 정수리
+      [[3, 17], [18, 25]],
+      [[3, 26]],
+      [[4, 26]],
+      [[4, 26]],
+      [[4, 25]],
+      [[3, 5], [7, 9], [15, 26]],
+      [[3, 5], [7, 9], [15, 26]],
+    ],
+    front: [[14, 15, 27], [15, 15, 27]],
+    paint: [
+      [9, 18, 19, 'e'], [10, 18, 19, 'e'], [11, 18, 19, 'e'], [12, 18, 19, 'e'], // 처진 귀
+      [11, 23, 26, 'f'], [12, 23, 26, 'f'],
+      [12, 24, 25, 'p'],
+      [12, 9, 16, 'f'], [13, 8, 17, 'f'],
+      [15, 25, 26, 'f'],
+    ],
+    eye: { x: 22, y: 10 }, nose: { x: 26, y: 12, c: 'k' },
+  },
+  rabbit: {
+    base: 'w',
+    sil: [
+      [],
+      [],
+      [[0, 2], [4, 9]],                       // 동그란 꼬리
+      [[0, 2], [3, 11]],
+      [[1, 12], [19, 20], [23, 24]],          // 긴 귀 — 머리 위에 붙어서
+      [[2, 13], [19, 20], [23, 24]],
+      [[2, 14], [19, 20], [23, 24]],
+      [[2, 15], [19, 20], [23, 24]],
+      [[3, 16], [18, 25]],
+      [[3, 17], [18, 25]],
+      [[3, 26]],
+      [[4, 26]],
+      [[4, 26]],
+      [[4, 25]],
+      [[3, 5], [7, 9], [15, 26]],
+      [[3, 5], [7, 9], [15, 26]],
+    ],
+    front: [[14, 15, 27], [15, 15, 27]],
+    paint: [
+      [4, 19, 19, 'p'], [5, 19, 19, 'p'], [6, 19, 19, 'p'],
+      [4, 24, 24, 'p'], [5, 24, 24, 'p'], [6, 24, 24, 'p'],  // 귀 속
+      [12, 24, 25, 'p'],
+      [12, 9, 16, 'u'], [13, 8, 17, 'u'],
+      [15, 25, 26, 'u'],
+    ],
+    eye: { x: 22, y: 10 }, nose: { x: 26, y: 12, c: 'p' },
+  },
+  hamster: {
+    base: 'n',
+    sil: [
+      [],
+      [],
+      [[4, 9]],
+      [[3, 11]],
+      [[2, 12]],
+      [[2, 13]],
+      [[2, 14]],
+      [[2, 15]],
+      [[3, 16], [19, 19], [24, 24]],          // 작은 귀
+      [[3, 17], [18, 25]],
+      [[3, 26]],
+      [[4, 26]],
+      [[4, 26]],
+      [[4, 25]],
+      [[3, 5], [7, 9], [15, 26]],
+      [[3, 5], [7, 9], [15, 26]],
+    ],
+    front: [[14, 15, 27], [15, 15, 27]],
+    paint: [
+      [11, 21, 26, 'w'], [12, 20, 26, 'w'], [13, 20, 25, 'w'], // 흰 얼굴
+      [12, 24, 25, 'p'],
+      [11, 9, 17, 'w'], [12, 8, 18, 'w'], [13, 8, 18, 'w'],    // 흰 배
+      [15, 25, 26, 'p'], [15, 3, 5, 'p'], [15, 7, 9, 'p'],     // 분홍 발
+    ],
+    eye: { x: 22, y: 9 }, nose: { x: 26, y: 11, c: 'k' },
+  },
+};
+
+const stretchCache = new Map();
+function stretchSprite(kind, dir, phase) {
+  const key = `${kind}/${dir}/${phase}`;
+  let g = stretchCache.get(key);
+  if (g) return g;
+  const D = STRETCH_DEFS[kind];
+  const sil = D.sil.map((r) => r.slice());
+  const paint = D.paint.slice();
+  if (phase) for (const [r, a, b] of D.front) sil[r].push([a, b]);
+  paint.push([D.eye.y, D.eye.x, D.eye.x + 1, 'k'], [D.eye.y + 1, D.eye.x, D.eye.x + 1, 'k']);
+  paint.push([D.nose.y, D.nose.x, D.nose.x, D.nose.c]);
+  g = buildSprite(sil, paint, D.base, 30);
+  if (dir < 0) g = g.map((row) => row.split('').reverse().join(''));
+  stretchCache.set(key, g);
+  return g;
+}
+
+/* 걸음 위상별 옆모습 그리드 — 만들어 두고 재사용.
+ * phase -1: 서 있음, 0/1: 엇갈린 다리
+ * 깡총(토끼): 2 공중 — 앞발은 앞으로 뻗고 뒷발은 뒤로 쭉
+ *            3 착지 — 앞발이 먼저 땅에, 뒷발은 아직 뒤
+ *            4 웅크림 — 뒷발을 앞발 쪽으로 끌어모아 다음 도약 준비
+ * (다리 배열의 앞 절반이 뒷다리, 뒤 절반이 앞다리) */
+const HOP_LEGS = {
+  //      [뒷다리 dx, 뒷다리 들림, 앞다리 dx, 앞다리 들림]
+  2: [-2, 1, 2, 1],
+  3: [-2, 1, 1, 0],
+  4: [2, 1, -1, 1],
+};
+const sideCache = new Map();
+function sideSprite(kind, dir, phase) {
+  const key = `${kind}/${dir}/${phase}`;
+  let g = sideCache.get(key);
+  if (g) return g;
+  const D = SIDE_DEFS[kind];
+  const L = D.legs;
+  const sil = D.sil.map((r) => r.slice());
+  const paint = D.paint.slice();
+  paint.push([D.eye.y, D.eye.x, D.eye.x + 1, 'k'], [D.eye.y + 1, D.eye.x, D.eye.x + 1, 'k']);
+  paint.push([D.nose.y, D.nose.x, D.nose.x, D.nose.c]);
+  for (let r = 0; r < L.h; r++) sil.push([]);
+  if (D.arm) {
+    const A = D.arm;
+    if (phase === 5) {
+      // 기지개 — 팔을 머리 옆으로 위로 쭉
+      for (let r = 0; r < 5; r++) {
+        sil[A.y - 4 + r].push([A.x, A.x + 1]);
+        paint.push([A.y - 4 + r, A.x, A.x + 1, A.c]);
+      }
+    } else {
+      const ay = A.y + (phase === 1 ? 1 : 0); // 걸음마다 한 칸 까딱
+      for (let r = 0; r < A.h; r++) {
+        sil[ay + r].push([A.x, A.x + A.w - 1]);
+        paint.push([ay + r, A.x, A.x + A.w - 1, A.c]);
+      }
+    }
+  }
+  const hop = HOP_LEGS[phase === 5 ? -1 : phase];
+  if (phase === 5) phase = -1;
+  L.xs.forEach((x, i) => {
+    let dx = 0;
+    let lift = 0;
+    if (hop) {
+      const hind = i < L.xs.length / 2;
+      dx = hind ? hop[0] : hop[2];
+      lift = hind ? hop[1] : hop[3];
+    } else if (phase >= 0) {
+      const fwd = i % 2 === phase;
+      dx = fwd ? 1 : -1;
+      lift = fwd ? 1 : 0;
+    }
+    for (let r = 0; r < L.h - lift; r++) sil[L.y + r].push([x + dx, x + dx + 2]);
+    paint.push([L.y + L.h - 1 - lift, x + dx, x + dx + 2, L.toe]); // 발끝
+  });
+  g = buildSprite(sil, paint, D.base, SIDE_W);
+  if (dir < 0) g = g.map((row) => row.split('').reverse().join(''));
+  sideCache.set(key, g);
+  return g;
+}
+
 const EYE_OPEN = ['kk', 'kk'];
 const EYE_BLINK = ['..', 'kk'];
 const EYE_HAPPY = ['k.k'];
@@ -1890,14 +2471,48 @@ const state = {
 const params = new URLSearchParams(location.search);
 const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating | sad
 
+/* ---- 돌아다니기 ----
+ * 일하는 중이 아닐 때 한참 가만히 있으면 펫이 책상에서 일어나 화면 맨 아래
+ * 가장자리를 바닥 삼아 좌우로 걸어 다닌다. 메인이 창을 "책상 위치부터 화면
+ * 바닥까지" 화면 폭으로 넓히고 클릭이 통과되게 바꿔 주면, 책상은 원래
+ * 자리(homePx, homeY)에 그대로 그리고 펫만 절반 크기로 옮겨 그린다.
+ * 키보드나 마우스를 건드리면 책상으로 달려와 앉고 창이 원래대로 돌아온다 */
+const ROAM_AFTER = params.get('roam') ? 3000 : 2 * 60000;
+const roam = {
+  active: false,
+  requested: false, // 메인에 넓혀 달라고 보낸 뒤 답을 기다리는 중
+  phase: 'off',     // leaving | walking | pausing | napping | returning | home
+  legs: 0,          // 이번에 나와서 걸은 횟수 — 몇 번 걸은 뒤에야 낮잠
+  action: 'front',  // 멈췄을 때 하는 것: front | look | flop | stretch
+  x: 0,             // 펫 기준점 (px) — 발 밑 가운데
+  y: 0,
+  target: 0,
+  targetY: 0,
+  dir: 1,
+  homePx: 0,        // 책상 장면의 원점 (px)
+  homeY: 0,
+  widthPx: 0,
+  heightPx: 0,
+  since: 0,
+  lastT: 0,
+  pauseUntil: 0,
+  runSpeed: 0,      // 돌아올 때 속도 (px/초) — 거리에 비례
+  hopT: 0,          // 토끼 깡총 위상
+};
+
 /* ---- 펫 크기 (메뉴바에서 변경) ----
  * 캔버스 자체를 도트 크기에 맞춰 다시 잡아 준다. CSS로 줄이면 도트가
  * 뭉개지지만, 칸 크기를 줄이면 어느 크기에서도 픽셀이 또렷하다. */
 function setPetSize(px) {
   SCALE = [4, 6, 8].includes(px) ? px : 8;
   HALF = SCALE / 2;
-  canvas.width = SCENE_W * SCALE;
-  canvas.height = SCENE_H * SCALE;
+  resizeCanvas();
+}
+
+/* 돌아다니는 동안은 캔버스가 화면 폭 전체 (책상은 제자리, 펫만 걸어 다닌다) */
+function resizeCanvas() {
+  canvas.width = roam.active ? roam.widthPx : SCENE_W * SCALE;
+  canvas.height = roam.active ? roam.heightPx : SCENE_H * SCALE;
   scene.width = canvas.width;
   scene.height = canvas.height;
   ctx.imageSmoothingEnabled = false; // 캔버스 크기를 바꾸면 초기화된다
@@ -1952,7 +2567,7 @@ function updateNag(now) {
   const timerBusy = timer.running ||
     !bubble.classList.contains('hidden') || !bragEl.classList.contains('hidden');
   const show = DEMO === 'nag' ||
-    (!DEMO && !timerBusy && !game.away && !state.locked && idle >= NAG_AFTER);
+    (!DEMO && !timerBusy && !game.away && !state.locked && !roam.active && idle >= NAG_AFTER);
   if (show && nagEl.classList.contains('hidden')) {
     nagEl.textContent = NAG_MESSAGES[Math.floor(Math.random() * NAG_MESSAGES.length)];
   }
@@ -3084,6 +3699,19 @@ const LADYBUG = [
   '.kkkk.',
 ];
 
+function drawNightOverlay() {
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.fillStyle = 'rgba(24,28,58,0.28)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function drawMoon(now) {
+  sprite(MOON, 38, 0);
+  if (Math.floor(now / 900) % 2) px(35, 2, 'y');
+  if (Math.floor(now / 1300) % 2) px(42, 3, 'W');
+}
+
 function drawVisitor(now) {
   if (!visitor.kind) return;
   if (now > visitor.until) {
@@ -3139,6 +3767,293 @@ function drawVisitor(now) {
  * 가만히 있을 땐 80ms(~12.5fps)로 제한해 CPU/GPU를 아끼고,
  * 타이핑/마우스/축하/시무룩 중엔 33ms(~30fps)로 올린다 —
  * 발 콩콩이 키 입력마다 토글이라 낮은 fps에선 프레임 사이에 뭉개진다 */
+
+/* ================================================================
+ * 돌아다니기 — 일하지 않을 때 책상을 떠나 화면 바닥을 걷는다
+ * ================================================================ */
+const ROAM_SCALE = 0.5;    // 돌아다닐 땐 절반 크기
+const ROAM_SPEED = 7;      // 걷기 속도 (도트/초, 절반 크기 기준)
+const ROAM_RUN_SPEED = 14; // 돌아올 때는 뛴다
+const HOP_MS = 620;        // 토끼 깡총 한 번
+const HOP_H = 5;           // 깡총 높이 (도트)
+const ROAM_SHADOW = 'rgba(30,22,17,0.18)';
+const ROAM_BOX_W = SIDE_W;  // 펫 상자 (도트) — 옆모습 폭에 맞춘다
+const ROAM_BOX_H = SCENE_H; // 발 밑 테두리가 22, 그림자가 23
+const roamPetW = () => ROAM_BOX_W * SCALE * ROAM_SCALE;
+const roamPetH = () => ROAM_BOX_H * SCALE * ROAM_SCALE;
+
+/* 앉아 있던 자리 — 정면 스프라이트의 발 밑 가운데 */
+function roamHomeAnchor() {
+  return { x: roam.homePx + (PET_X + 10) * SCALE, y: roam.homeY + SCENE_H * SCALE };
+}
+
+function updateRoam(now) {
+  if (roam.active) {
+    // 돌아올 이유: 사용자가 돌아왔다 / 일 시작 / 화면 잠금
+    const back = state.lastKey > roam.since || state.lastMouse > roam.since ||
+      game.working || state.locked || timer.running;
+    if (back && roam.phase !== 'returning' && roam.phase !== 'home') {
+      const h = roamHomeAnchor();
+      roam.phase = 'returning';
+      roam.target = h.x;
+      roam.targetY = h.y;
+      roam.runSpeed = Math.hypot(h.x - roam.x, h.y - roam.y) / 2;
+    }
+    return;
+  }
+  if (roam.requested || DEMO || !window.pet || !window.pet.roam) return;
+  if (game.working || state.locked || timer.running) return;
+  const idle = now - Math.max(state.lastKey, state.lastMouse, startTime);
+  if (idle < ROAM_AFTER) return;
+  roam.requested = true;
+  window.pet.roam(true);
+}
+
+/* 메인이 창을 넓힌 뒤 보내 주는 기하: 캔버스 크기와 책상이 있던 자리 */
+function startRoam(geo) {
+  const now = performance.now();
+  roam.active = true;
+  roam.requested = false;
+  roam.widthPx = geo.widthPx;
+  roam.heightPx = geo.heightPx;
+  roam.homePx = geo.homePx;
+  roam.homeY = geo.homeY;
+  const h = roamHomeAnchor();
+  roam.x = h.x;
+  roam.y = h.y;
+  roam.since = now;
+  roam.lastT = now;
+  roam.dir = 1;
+  document.body.classList.add('roaming');
+  resizeCanvas();
+  // 먼저 책상 앞 바닥으로 뛰어 내려간 뒤 돌아다닌다 — 창이 높이 있어도 1초 남짓
+  roam.target = h.x;
+  roam.targetY = roam.heightPx;
+  roam.phase = 'leaving';
+  roam.runSpeed = Math.abs(roam.heightPx - h.y) / 1.2;
+  roam.legs = 0;
+  render(now);
+  window.pet.roamReady();
+}
+
+/* 메인이 창을 되돌린 뒤 null을 보내면 그때 원래 화면으로 — 그 전에 바꾸면
+ * 넓은 창 왼쪽 위에 앉은 모습이 한 프레임 보인다 */
+function leaveRoam() {
+  if (!roam.active) return;
+  roam.active = false;
+  roam.requested = false;
+  roam.phase = 'off';
+  document.body.classList.remove('roaming');
+  resizeCanvas();
+  render(performance.now());
+  window.pet.roamReady();
+}
+
+function pickRoamTarget(now) {
+  const half = roamPetW() / 2;
+  const lo = half;
+  const hi = roam.widthPx - half;
+  if (hi <= lo) {
+    roam.target = roam.x;
+    roam.phase = 'pausing'; roam.action = 'front'; roam.pauseUntil = now + 3000;
+    return;
+  }
+  // 짧은 산책 — 현재 위치에서 12~50칸(절반 크기 기준) 떨어진 곳을 고른다.
+  // 멀리 가면 옆모습만 오래 보이니, 자주 멈춰 서서 이쪽을 보게
+  const unit = SCALE * ROAM_SCALE;
+  const span = (12 + Math.random() * 38) * unit;
+  let dir = Math.random() < 0.5 ? -1 : 1;
+  if (roam.x + dir * span < lo || roam.x + dir * span > hi) dir = -dir; // 끝에 막히면 반대로
+  const tx = Math.min(hi, Math.max(lo, roam.x + dir * span));
+  roam.target = tx;
+  roam.targetY = roam.heightPx; // 바닥
+  roam.phase = 'walking';
+  roam.legs += 1;
+}
+
+function renderRoam(now) {
+  const dt = Math.min(0.1, (now - roam.lastT) / 1000);
+  roam.lastT = now;
+
+  const running = roam.phase === 'returning' || roam.phase === 'leaving';
+  const moving = roam.phase === 'walking' || running;
+  if (moving) {
+    const dx = roam.target - roam.x;
+    const dyPx = roam.targetY - roam.y;
+    const dist = Math.hypot(dx, dyPx);
+    // 책상을 오르내릴 땐 뛴다 — 멀리 있어도 금방 닿도록
+    const speed = running
+      ? Math.max(ROAM_RUN_SPEED * SCALE * ROAM_SCALE, roam.runSpeed || 0)
+      : ROAM_SPEED * SCALE * ROAM_SCALE;
+    if (Math.abs(dx) > SCALE) roam.dir = dx < 0 ? -1 : 1; // 거의 수직이면 보던 쪽 유지
+    const step = Math.min(dist, speed * dt);
+    if (dist > 0) {
+      roam.x += (dx / dist) * step;
+      roam.y += (dyPx / dist) * step;
+    }
+    if (dist - step < 0.5) {
+      roam.x = roam.target;
+      roam.y = roam.targetY;
+      if (roam.phase === 'returning') {
+        roam.phase = 'home'; // 앞을 보고 서서 창이 돌아오길 기다린다
+        window.pet.roam(false);
+      } else if (roam.phase === 'leaving') {
+        pickRoamTarget(now); // 바닥에 닿으면 바로 걷기 시작
+      } else if (roam.legs >= 3 && Math.random() < 0.1) {
+        // 몇 번 걸어 다닌 뒤엔 가끔 그 자리에서 짧은 낮잠
+        roam.phase = 'napping';
+        roam.pauseUntil = now + 8000 + Math.random() * 8000;
+      } else {
+        // 멈춰 서서 뭔가 한다 — 이쪽 보기 / 두리번 / 발라당 / 기지개
+        roam.phase = 'pausing';
+        const r = Math.random();
+        roam.action = r < 0.4 ? 'front' : r < 0.65 ? 'look' : r < 0.85 ? 'flop' : 'stretch';
+        const dur = { front: [2000, 4000], look: [3000, 3000], flop: [4000, 5000], stretch: [1600, 1000] }[roam.action];
+        roam.pauseUntil = now + dur[0] + Math.random() * dur[1];
+      }
+    }
+  } else if (roam.phase !== 'home' && now >= roam.pauseUntil) {
+    pickRoamTarget(now);
+  }
+
+  const night = isNight();
+
+  // 책상은 원래 자리에 — 펫과 발만 빠져 있다
+  ctx.save();
+  ctx.translate(roam.homePx, roam.homeY);
+  drawFloorShadow();
+  drawDesk(now);
+  DESK_ITEMS[deskItem].draw(now);
+  drawMonitor(now, false);
+  drawKeyboard(now, false);
+  drawMouse(0);
+  if (night) drawMoon(now);
+  ctx.restore();
+
+  drawRoamPet(now, moving);
+
+  if (night) drawNightOverlay();
+
+  const di = DESK_ITEMS[deskItem];
+  if (di.glow) {
+    ctx.save();
+    ctx.translate(roam.homePx, roam.homeY);
+    di.glow(now, night);
+    ctx.restore();
+  }
+}
+
+/* 펫 — 절반 크기, 기준점(roam.x, roam.y)이 발 밑 가운데.
+ * 걸을 땐 옆모습, 멈추면 이쪽을 보고, 낮잠은 옆으로 누워 잔다 */
+function drawRoamPet(now, moving) {
+  const D = SIDE_DEFS[petKind];
+  const napping = roam.phase === 'napping';
+  const action = roam.phase === 'home' ? 'front' : roam.phase === 'pausing' ? roam.action : null;
+  const front = action === 'front' || action === 'look';
+
+  let closed = napping;
+  if (!napping) {
+    if (now > state.nextBlink) {
+      state.blinkUntil = now + 140;
+      state.nextBlink = now + 2200 + Math.random() * 2600;
+    }
+    closed = now < state.blinkUntil;
+  }
+
+  // 걸음/깡총/뒤뚱 — 걸음 위상과 몸 높이
+  let phase = -1;
+  let lift = 0; // 도트 단위, 위로
+  if (moving) {
+    const T = roam.phase === 'walking' ? 1 : 0.7;
+    if (D.gait === 'hop') {
+      // 웅크림 → 도약(공중) → 착지 → 웅크림
+      const t = ((now * T) % HOP_MS) / HOP_MS;
+      if (t < 0.15) phase = 4;
+      else if (t < 0.6) {
+        phase = 2;
+        lift = Math.round(HOP_H * Math.sin(((t - 0.15) / 0.45) * Math.PI));
+      } else if (t < 0.8) phase = 3;
+      else phase = 4;
+    } else {
+      phase = Math.floor((now * T) / 160) % 2;
+      if (D.gait === 'waddle') lift = phase; // 뒤뚱
+    }
+  }
+
+  const unit = SCALE * ROAM_SCALE; // 절반 크기 도트 한 칸
+  const tx = Math.round((roam.x - roamPetW() / 2) / HALF) * HALF;
+  const ty = Math.round((roam.y - roamPetH()) / HALF) * HALF;
+  ctx.save();
+  ctx.translate(tx, ty);
+  ctx.scale(ROAM_SCALE, ROAM_SCALE);
+
+  rect(3, ROAM_BOX_H - 1, ROAM_BOX_W - 6, 1, ROAM_SHADOW);
+  skinMap = petSkinMap(now);
+  const rim = SKINS[petSkin] && SKINS[petSkin].rim;
+
+  if (front) {
+    // 정면 — 앉은 스프라이트 몸통에 발 두 개를 붙여 세운다
+    const P = PET_DEFS[petKind];
+    const body = P.stand;
+    const ox = (ROAM_BOX_W - 22) / 2;
+    const oy = ROAM_BOX_H - 2 - body.length; // 발이 몸 아래 둥근 끝에 겹친다
+    if (rim) spriteRim(body, ox, oy, rim);
+    sprite(body, ox, oy);
+    const eye = closed ? EYE_BLINK : EYE_OPEN;
+    // 두리번 — 눈동자가 좌우로 한 칸씩
+    const look = action === 'look' ? [0, 1, 0, -1][Math.floor(now / 700) % 4] : 0;
+    const m = skinMap;
+    if (m && m.__eye) skinMap = { ...m, k: m.__eye };
+    sprite(eye, ox + 1 + P.eyes.lx + look, oy + 1 + P.eyes.y);
+    sprite(eye, ox + 1 + P.eyes.rx + look, oy + 1 + P.eyes.y);
+    skinMap = m;
+    // 코·입 — P.face는 PET_X/PET_Y 기준이라 그만큼 옮겨서
+    ctx.translate((ox + 1 - PET_X) * SCALE, (oy + 1 - PET_Y) * SCALE);
+    P.face(0);
+    ctx.translate(-(ox + 1 - PET_X) * SCALE, -(oy + 1 - PET_Y) * SCALE);
+    sprite(P.paw, ox + 4, ROAM_BOX_H - 5);
+    sprite(P.paw, ox + 13, ROAM_BOX_H - 5);
+  } else if (action === 'flop') {
+    // 발라당 — 등을 바닥에 대고 배를 보이며 뒷발을 버둥거린다
+    const kick = Math.floor(now / 450) % 2;
+    const body = flopSprite(petKind, -roam.dir, kick); // 머리는 보던 쪽
+    const ox = (ROAM_BOX_W - body[0].length) / 2;
+    const oy = ROAM_BOX_H - 1 - body.length;
+    if (rim) spriteRim(body, ox, oy, rim);
+    sprite(body, ox, oy);
+  } else if (action === 'stretch' && STRETCH_DEFS[petKind]) {
+    // 기지개 — 앞발을 쭉 뻗고 가슴을 낮춘다. 1초에 한 번 조금 더 민다
+    const ph = Math.floor(now / 1000) % 2;
+    const body = stretchSprite(petKind, roam.dir, ph);
+    const ox = (ROAM_BOX_W - body[0].length) / 2;
+    const oy = ROAM_BOX_H - 1 - body.length;
+    if (rim) spriteRim(body, ox, oy, rim);
+    sprite(body, ox, oy);
+  } else {
+    // 해달 기지개 — 두 발로 서서 팔을 위로 쭉 (phase 5), 몸도 한 칸 위로
+    const stretching = action === 'stretch';
+    let grid = sideSprite(petKind, roam.dir, stretching ? 5 : phase);
+    const oy = ROAM_BOX_H - 1 - grid.length - lift - (stretching && Math.floor(now / 1000) % 2 ? 1 : 0);
+    if (rim) spriteRim(grid, 0, oy, rim);
+    sprite(grid, 0, oy);
+    if (closed) {
+      // 눈 윗줄을 몸 색으로 덮으면 감은 눈 (한 줄)
+      for (let k = 0; k < 2; k++) {
+        const gx = D.eye.x + 1 + k;
+        px(roam.dir < 0 ? SIDE_W - 1 - gx : gx, oy + D.eye.y + 1, D.base);
+      }
+    }
+    if (napping) {
+      const ph = Math.floor(now / 700) % 2;
+      const zx = roam.dir < 0 ? 1 : SIDE_W - 2;
+      sprite(Z_SMALL, zx, oy - 3 - ph);
+      if (ph) sprite(Z_BIG, zx + (roam.dir < 0 ? -4 : 3), oy - 5);
+    }
+  }
+  skinMap = null;
+  ctx.restore();
+}
+
 const FRAME_MS = 80;
 const FRAME_ACTIVE_MS = 33;
 
@@ -3146,7 +4061,7 @@ const FRAME_ACTIVE_MS = 33;
  * 다음 프레임까지 필요한 만큼만 자고 일어나는 타이머로 돈다 */
 function isActive(now) {
   return now - state.lastKey < 600 || now - state.lastMouse < 600 ||
-    now < state.celebrateUntil || now < state.sadUntil || !!visitor.kind;
+    now < state.celebrateUntil || now < state.sadUntil || !!visitor.kind || roam.active;
 }
 
 function loop() {
@@ -3168,6 +4083,12 @@ function render(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   updateNag(now);
+  updateRoam(now);
+  if (roam.active) {
+    renderRoam(now);
+    presentIfChanged();
+    return;
+  }
   const mode = currentMode(now);
   state.mode = mode;
 
@@ -3272,13 +4193,8 @@ function render(now) {
   // 칠하면 창 전체에 어두운 상자가 보인다
   const night = isNight();
   if (night) {
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = 'rgba(24,28,58,0.28)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'source-over';
-    sprite(MOON, 38, 0);
-    if (Math.floor(now / 900) % 2) px(35, 2, 'y');
-    if (Math.floor(now / 1300) % 2) px(42, 3, 'W');
+    drawNightOverlay();
+    drawMoon(now);
   }
 
   drawVisitor(now);
@@ -3310,6 +4226,14 @@ if (window.pet) {
       state.lastMouse = now;
     }
   });
+
+  // 돌아다니기 — 메인이 창을 넓히면 기하를 보내 주고, 되돌리면 null
+  if (window.pet.onRoam) {
+    window.pet.onRoam((geo) => {
+      if (geo) startRoam(geo);
+      else leaveRoam();
+    });
+  }
 
   // 화면 잠금·잠자기 — 자리 비움처럼 정산이 멈춘다. 풀리면 방금 돌아온 것으로
   // 쳐서(lastKey 갱신) 잔소리·감점 유예가 다시 10분부터 시작한다
