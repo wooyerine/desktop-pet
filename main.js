@@ -75,10 +75,25 @@ function startRoam() {
   });
 }
 
+/* 산책 중 창은 클릭이 통과된다. 커서가 원래 창 자리(책상·버튼·HUD)에
+ * 들어오면 그동안만 클릭을 잡는다 — 렌더러의 hover는 통과 상태에선 못 받으니
+ * 메인이 받는 마우스 이벤트로 판단한다 */
+let roamHoverInside = false;
+function updateRoamHover() {
+  if (!roamHome || !win || win.isDestroyed()) return;
+  const p = screen.getCursorScreenPoint();
+  const h = roamHome;
+  const inside = p.x >= h.x && p.x < h.x + h.width && p.y >= h.y && p.y < h.y + h.height;
+  if (inside === roamHoverInside) return;
+  roamHoverInside = inside;
+  win.setIgnoreMouseEvents(!inside, { forward: true });
+}
+
 function endRoam() {
   if (!roamHome || !win || win.isDestroyed()) return;
   const home = roamHome;
   roamHome = null;
+  roamHoverInside = false;
   hideForRoamSwap();
   win.setIgnoreMouseEvents(false);
   win.setBounds(home);
@@ -329,11 +344,11 @@ function startInputHooks() {
       const { uIOhook } = require('uiohook-napi');
       let lastMouse = 0;
       uIOhook.on('keydown', () => send('key'));
-      uIOhook.on('mousedown', () => send('mouse'));
+      uIOhook.on('mousedown', () => { updateRoamHover(); send('mouse'); });
       uIOhook.on('wheel', () => send('mouse'));
       uIOhook.on('mousemove', () => {
         const now = Date.now();
-        if (now - lastMouse > 80) { lastMouse = now; send('mouse'); }
+        if (now - lastMouse > 80) { lastMouse = now; send('mouse'); updateRoamHover(); }
       });
       uIOhook.start();
       hook = uIOhook;
@@ -355,6 +370,7 @@ function startInputHooks() {
       if (p.x !== last.x || p.y !== last.y) {
         last = p;
         send('mouse');
+        updateRoamHover();
       }
     }, 150);
   }
@@ -669,11 +685,7 @@ ipcMain.on('fit', (_e, height) => {
 });
 
 ipcMain.on('roam', (_e, on) => (on ? startRoam() : endRoam()));
-// 산책 중 버튼 바 위에 마우스가 올라오면 잠깐 클릭을 잡는다
-ipcMain.on('click-through', (_e, on) => {
-  if (!roamHome || !win || win.isDestroyed()) return;
-  win.setIgnoreMouseEvents(!!on, { forward: true });
-});
+
 ipcMain.on('roam-ready', showAfterRoamSwap);
 
 /* 렌더러가 새 화면을 그렸다고 알리면 다시 보이게. 혹시 신호가 안 와도

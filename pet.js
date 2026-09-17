@@ -4239,14 +4239,6 @@ if (window.pet) {
     }
   });
 
-  // 돌아다니는 동안 창은 클릭이 통과된다 — 버튼 바·HUD 위에서만 잡는다
-  if (window.pet.clickThrough) {
-    for (const el of [document.getElementById('bar'), hudLevel.parentElement]) {
-      el.addEventListener('mouseenter', () => { if (roam.active) window.pet.clickThrough(false); });
-      el.addEventListener('mouseleave', () => { if (roam.active) window.pet.clickThrough(true); });
-    }
-  }
-
   // 돌아다니기 — 메인이 창을 넓히면 기하를 보내 주고, 되돌리면 null
   if (window.pet.onRoam) {
     window.pet.onRoam((geo) => {

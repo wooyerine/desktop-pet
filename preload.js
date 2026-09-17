@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld('pet', {
   onRoam: (cb) => ipcRenderer.on('roam', (_e, geo) => cb(geo)),
   roam: (on) => ipcRenderer.send('roam', on),
   roamReady: () => ipcRenderer.send('roam-ready'),
-  clickThrough: (on) => ipcRenderer.send('click-through', on),
   fit: (height) => ipcRenderer.send('fit', height),
   notify: (title, body) => ipcRenderer.send('notify', { title, body }),
   quit: () => ipcRenderer.send('quit'),
