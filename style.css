@@ -57,7 +57,7 @@ html, body {
 #brag::after {
   content: '';
   position: absolute;
-  left: 38px;
+  left: var(--tail-left, 38px);
   bottom: -12px;
   width: 8px;
   height: 8px;
@@ -123,7 +123,7 @@ html, body {
 
 /* 돌아다니는 동안은 캔버스만 — 창이 화면 폭이라 버튼·HUD·말풍선을 숨긴다 */
 .roaming #app { padding: 0; }
-.roaming #app > :not(#pet-canvas):not(#bar):not(#hud):not(#panel):not(#rank-panel):not(#grass-panel):not(#deco-panel):not(#ach-panel) { display: none !important; }
+.roaming #app > :not(#pet-canvas):not(#bar):not(#hud):not(#toast):not(#brag):not(#panel):not(#rank-panel):not(#grass-panel):not(#deco-panel):not(#ach-panel) { display: none !important; }
 /* 버튼 바와 HUD는 책상 자리에 남는다 — pet.js가 --home-cx/--home-bottom을 넣어 준다 */
 .roaming #bar,
 .roaming #hud {
@@ -133,6 +133,15 @@ html, body {
 }
 .roaming #bar { top: calc(var(--home-bottom) + 6px); }
 .roaming #hud { top: calc(var(--home-bottom) + 6px + 30px + 6px); }
+/* 말풍선(토스트·자랑)은 산책 중인 펫 머리 위 — 위치는 pet.js placeRoamSpeech가 매 프레임 */
+.roaming #toast,
+.roaming #brag {
+  position: absolute;
+  margin-left: 0;
+  max-width: none;
+  white-space: nowrap;
+  pointer-events: none;
+}
 /* 패널도 책상 자리 HUD 밑에 — 펫은 산책을 계속한다 */
 .roaming #panel,
 .roaming #rank-panel,

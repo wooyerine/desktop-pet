@@ -3778,6 +3778,7 @@ const ROAM_SPEED = 7;      // 걷기 속도 (도트/초, 절반 크기 기준)
 const ROAM_RUN_SPEED = 14; // 돌아올 때는 뛴다
 const HOP_MS = 620;        // 토끼 깡총 한 번
 const HOP_H = 5;           // 깡총 높이 (도트)
+const ROAM_SPEECH_H = 0.75; // 말풍선을 띄울 머리 높이 — 펫 상자 높이 대비
 const ROAM_SHADOW = 'rgba(30,22,17,0.18)';
 const ROAM_BOX_W = SIDE_W;  // 펫 상자 (도트) — 옆모습 폭에 맞춘다
 const ROAM_BOX_H = SCENE_H; // 발 밑 테두리가 22, 그림자가 23
@@ -3911,6 +3912,7 @@ function leaveRoam() {
   roam.phase = 'off';
   document.body.classList.remove('roaming');
   document.body.classList.remove('desk-hover');
+  for (const el of [toastEl, bragEl]) { el.style.left = ''; el.style.top = ''; }
   resizeCanvas();
   render(performance.now());
   window.pet.roamReady();
@@ -3943,7 +3945,9 @@ function renderRoam(now) {
   roam.lastT = now;
 
   const running = roam.phase === 'returning' || roam.phase === 'leaving';
-  const moving = roam.phase === 'walking' || running;
+  // 말풍선이 떠 있는 동안은 멈춰 서서 이쪽을 보고 말한다 (책상을 오르내리는 중엔 마저 뛴다)
+  const speaking = !running && roamSpeaking();
+  const moving = !speaking && (roam.phase === 'walking' || running);
   if (moving) {
     const dx = roam.target - roam.x;
     const dyPx = roam.targetY - roam.y;
@@ -3979,7 +3983,7 @@ function renderRoam(now) {
         roam.pauseUntil = now + dur[0] + Math.random() * dur[1];
       }
     }
-  } else if (roam.phase !== 'home' && now >= roam.pauseUntil) {
+  } else if (!speaking && roam.phase !== 'home' && now >= roam.pauseUntil) {
     pickRoamTarget(now);
   }
 
@@ -3997,7 +4001,7 @@ function renderRoam(now) {
   if (night) drawMoon(now);
   ctx.restore();
 
-  drawRoamPet(now, moving);
+  drawRoamPet(now, moving, speaking);
 
   if (night) drawNightOverlay();
 
@@ -4012,10 +4016,28 @@ function renderRoam(now) {
 
 /* 펫 — 절반 크기, 기준점(roam.x, roam.y)이 발 밑 가운데.
  * 걸을 땐 옆모습, 멈추면 이쪽을 보고, 낮잠은 옆으로 누워 잔다 */
-function drawRoamPet(now, moving) {
+/* 산책 중 말풍선(토스트·자랑)은 걷고 있는 펫이 한다 — 매 프레임 머리 위로 옮기고,
+ * 화면 가장자리에선 풍선은 안쪽에 두고 꼬리만 펫을 따라간다 */
+function roamSpeaking() {
+  return !toastEl.classList.contains('hidden') || !bragEl.classList.contains('hidden');
+}
+
+function placeRoamSpeech() {
+  for (const el of [toastEl, bragEl]) {
+    if (el.classList.contains('hidden')) continue;
+    const w = el.offsetWidth;
+    const left = Math.round(Math.min(Math.max(roam.x - 46, 4), Math.max(4, roam.widthPx - w - 4)));
+    const top = Math.round(Math.max(0, roam.y - roamPetH() * ROAM_SPEECH_H - el.offsetHeight - 14));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.setProperty('--tail-left', `${Math.round(Math.min(Math.max(roam.x - left - 8, 8), w - 28))}px`);
+  }
+}
+
+function drawRoamPet(now, moving, speaking) {
   const D = SIDE_DEFS[petKind];
-  const napping = roam.phase === 'napping';
-  const action = roam.phase === 'home' ? 'front' : roam.phase === 'pausing' ? roam.action : null;
+  const napping = roam.phase === 'napping' && !speaking;
+  const action = speaking || roam.phase === 'home' ? 'front' : roam.phase === 'pausing' ? roam.action : null;
   const front = action === 'front' || action === 'look';
 
   let closed = napping;
@@ -4154,6 +4176,7 @@ function render(now) {
   updateRoam(now);
   if (roam.active) {
     renderRoam(now);
+    placeRoamSpeech();
     presentIfChanged();
     return;
   }
