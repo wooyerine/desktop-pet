@@ -56,6 +56,7 @@ const APP_PAD_TOP = 8; // style.css #app padding-top — 캔버스가 창 위에
  * 그린 뒤 'roam-ready'를 보내면 다시 보이게 한다 */
 function startRoam() {
   if (roamHome || !win || win.isDestroyed()) return;
+  if (sheetsOpen) { roamDeferred = true; return; } // 시트가 닫히면 그때 나간다
   const home = win.getBounds();
   const area = screen.getDisplayMatching(home).workArea;
   const canvasW = SCENE_W * settings.petPx;
@@ -121,6 +122,26 @@ function endRoam() {
   win.setIgnoreMouseEvents(false);
   win.setBounds(home);
   win.webContents.send('roam', null);
+}
+
+/* 펫 창에 붙는 시트(업데이트 안내 등). 산책 중엔 창이 화면 폭이라 시트도
+ * 그만큼 커진다 — 먼저 책상 크기로 되돌리고, 닫힐 때까지 산책을 미룬다 */
+let sheetsOpen = 0;
+let roamDeferred = false;
+async function showSheet(opts) {
+  sheetsOpen++;
+  try {
+    if (roamHome) {
+      endRoam(); // 렌더러가 곧 다시 나가겠다고 하면 startRoam이 닫힌 뒤로 미룬다
+      await new Promise((r) => setTimeout(r, 450)); // 창이 다시 보일 때까지 (hideForRoamSwap)
+    }
+    return await dialog.showMessageBox(win, opts);
+  } finally {
+    if (--sheetsOpen === 0 && roamDeferred) {
+      roamDeferred = false;
+      startRoam();
+    }
+  }
 }
 
 /* 펫 크기를 바꾸고 창 폭을 맞춘다. 높이는 렌더러가 재서 'fit'으로 알려준다 */
@@ -311,7 +332,7 @@ function refreshTrayMenu() {
 
 /* 규칙 숫자는 pet.js의 상수와 맞춰 둔다 (NAG_AFTER, WORK_BONUS, XP_PER_LEVEL …) */
 function showManual() {
-  dialog.showMessageBox(win, {
+  showSheet({
     type: 'none',
     title: '게임 규칙',
     message: '펫 키우기 규칙',
@@ -431,7 +452,7 @@ async function manualUpdateCheck() {
     // 새 버전이 있으면 update-available 핸들러가 대화상자를 띄운다 —
     // 여기서는 "이미 최신"일 때만 알려 주면 된다
     if (!res || !pendingUpdate) {
-      dialog.showMessageBox(win, {
+      showSheet({
         type: 'none',
         message: '지금이 최신 버전이에요',
         detail: `Desktop Pet v${app.getVersion()}`,
@@ -440,7 +461,7 @@ async function manualUpdateCheck() {
     }
   } catch (err) {
     logUpdateError(err);
-    dialog.showMessageBox(win, {
+    showSheet({
       type: 'none',
       message: '업데이트 확인에 실패했어요',
       detail: '네트워크를 확인하고 잠시 뒤 다시 시도해 주세요.',
@@ -505,7 +526,7 @@ function setupAutoUpdate() {
     promptedVersion = info.version;
     // 펫 창에 붙는 시트로 — 독립 창은 다른 앱에서 타이핑하다 Enter로
     // 자기도 모르게 눌러 버릴 수 있다
-    const { response } = await dialog.showMessageBox(win, {
+    const { response } = await showSheet({
       type: 'info',
       message: `새 버전 v${info.version}이 나왔어요!`,
       detail: `지금 버전은 v${app.getVersion()}. 업데이트할까요?\n나중에 하려면 메뉴바 아이콘에서 "업데이트 받기"를 누르면 돼요.`,
@@ -526,7 +547,7 @@ function setupAutoUpdate() {
     pendingUpdate = null;
     updateBusy = false;
     refreshTrayMenu();
-    const { response } = await dialog.showMessageBox(win, {
+    const { response } = await showSheet({
       type: 'info',
       message: '업데이트 준비 완료',
       detail: '지금 재시작해서 설치할까요? 나중에 해도 앱을 끌 때 설치돼요.',
@@ -553,7 +574,7 @@ function setupAutoUpdate() {
 
 /* 자동 교체가 불가능한 상황(권한/설치 위치)이면 수동 다운로드로 안내 */
 async function manualUpdateFallback(version) {
-  const { response } = await dialog.showMessageBox(win, {
+  const { response } = await showSheet({
     type: 'info',
     message: '자동 업데이트를 할 수 없어요',
     detail: `다운로드 페이지에서 v${version}을 받아 Applications에 넣어 주세요.`,
@@ -637,7 +658,7 @@ async function macSwapUpdate(info) {
 
   // 6) 재시작 — 실행 중인 프로세스는 옛 버전이므로 바로 새로 뜨는 게 안전
   sendUpdateProgress({ done: true });
-  const { response } = await dialog.showMessageBox(win, {
+  const { response } = await showSheet({
     type: 'info',
     message: `v${info.version} 설치 완료!`,
     detail: '지금 재시작할까요? 나중에 하면 다음 실행부터 새 버전이에요.\n' +
@@ -707,7 +728,11 @@ ipcMain.on('fit', (_e, height) => {
   setWindowSize(winWidth(settings.petPx), clamp(Math.ceil(height), 80, 1400));
 });
 
-ipcMain.on('roam', (_e, on) => (on ? startRoam() : endRoam()));
+ipcMain.on('roam', (_e, on) => {
+  if (on) return startRoam();
+  roamDeferred = false;
+  endRoam();
+});
 ipcMain.on('desk-drag', (_e, on) => {
   roamDragging = !!on;
   if (!on) updateRoamHover();
