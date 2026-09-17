@@ -724,7 +724,15 @@ ipcMain.handle('status', () => ({ accessibilityOK, platform: process.platform })
 // 남는 투명 영역이 없어야 그 자리의 다른 앱을 클릭할 수 있다
 ipcMain.on('fit', (_e, height) => {
   if (!win || win.isDestroyed()) return;
-  if (!Number.isFinite(height) || roamHome) return; // 돌아다니는 중엔 창이 화면 크기
+  if (!Number.isFinite(height)) return;
+  if (roamHome) {
+    // 돌아다니는 중엔 창이 화면 크기 — 원래 창 자리의 높이만 바꾼다 (클릭을 잡는 범위,
+    // 돌아올 때의 창 크기). 패널이 화면 아래로 넘치면 moveDesk가 책상을 올린다
+    roamHome.height = clamp(Math.ceil(height), 80, 1400);
+    moveDesk(0, 0);
+    updateRoamHover();
+    return;
+  }
   setWindowSize(winWidth(settings.petPx), clamp(Math.ceil(height), 80, 1400));
 });
 

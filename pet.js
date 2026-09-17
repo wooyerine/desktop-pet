@@ -2476,12 +2476,13 @@ const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating | 
  * 좌우로 걸어 다닌다 (앱을 켜자마자, 일을 끝내자마자). 메인이 창을 "책상 위치부터 화면
  * 바닥까지" 화면 폭으로 넓히고 클릭이 통과되게 바꿔 주면, 책상은 원래
  * 자리(homePx, homeY)에 그대로 그리고 펫만 절반 크기로 옮겨 그린다.
- * 일 시작·타이머·패널 열기·화면 잠금이면 책상으로 달려와 앉고 창이 원래대로
+ * 일 시작·타이머·화면 잠금이면 책상으로 달려와 앉고 창이 원래대로
  * 돌아온다. 버튼 바와 HUD는 책상 자리에 남아 있어서 산책 중에도 누를 수 있다 */
-const ROAM_START_DELAY = 800; // 앱이 뜨고 창 높이가 맞춰질 시간
+const ROAM_DELAY = 30000; // 책상에 있을 이유가 없어진 뒤 나가기까지 — 바로 나가면 어색하다
 const roam = {
   active: false,
   requested: false, // 메인에 넓혀 달라고 보낸 뒤 답을 기다리는 중
+  freeSince: null,  // 책상에 있을 이유가 없어진 시각 — ROAM_DELAY 뒤에 나간다
   phase: 'off',     // leaving | walking | pausing | napping | returning | home
   legs: 0,          // 이번에 나와서 걸은 횟수 — 몇 번 걸은 뒤에야 낮잠
   action: 'front',  // 멈췄을 때 하는 것: front | look | flop | stretch
@@ -3788,14 +3789,10 @@ function roamHomeAnchor() {
   return { x: roam.homePx + (PET_X + 10) * SCALE, y: roam.homeY + SCENE_H * SCALE };
 }
 
-function anyPanelOpen() {
-  return [panel, rankPanel, grassPanel, decoPanel, achPanel]
-    .some((p) => !p.classList.contains('hidden'));
-}
-
-/* 책상에 있어야 하는 이유 — 하나라도 있으면 돌아오고, 없으면 나간다 */
+/* 책상에 있어야 하는 이유 — 하나라도 있으면 돌아오고, 없으면 나간다.
+ * 패널(랭킹·잔디밭·꾸미기 …)은 구경만 하는 거라 펫을 불러들이지 않는다 */
 function mustBeAtDesk() {
-  return game.working || state.locked || timer.running || anyPanelOpen();
+  return game.working || state.locked || timer.running;
 }
 
 function updateRoam(now) {
@@ -3810,8 +3807,10 @@ function updateRoam(now) {
     }
     return;
   }
+  if (mustBeAtDesk()) { roam.freeSince = null; return; }
+  if (roam.freeSince === null) roam.freeSince = now;
   if (roam.requested || DEMO || !window.pet || !window.pet.roam) return;
-  if (mustBeAtDesk() || now - startTime < ROAM_START_DELAY) return;
+  if (now - roam.freeSince < ROAM_DELAY) return;
   roam.requested = true;
   window.pet.roam(true);
 }
@@ -3836,6 +3835,7 @@ function startRoam(geo) {
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty('--home-cx', `${geo.homePx + SCENE_W * SCALE / 2}px`);
   rootStyle.setProperty('--home-bottom', `${geo.homeY + SCENE_H * SCALE}px`);
+  rootStyle.setProperty('--hud-h', `${document.getElementById('hud').offsetHeight}px`);
   resizeCanvas();
   // 먼저 책상 앞 바닥으로 뛰어 내려간 뒤 돌아다닌다 — 창이 높이 있어도 1초 남짓
   roam.target = h.x;
@@ -5015,12 +5015,27 @@ if (DEMO_VISITOR && VISITORS[DEMO_VISITOR]) {
 const appEl = document.getElementById('app');
 let lastFitH = 0;
 
+const APP_PAD_TOP = 8;    // style.css #app padding
+const APP_PAD_BOTTOM = 5;
+const fitEls = document.querySelectorAll('#bar, #hud, #panel, #rank-panel, #grass-panel, #deco-panel, #ach-panel');
+
 function reportFit() {
-  const h = Math.ceil(appEl.getBoundingClientRect().height);
+  let h;
+  if (roam.active) {
+    // 산책 중엔 #app이 화면 크기다 — 책상 자리에 떠 있는 버튼·HUD·패널의 맨 아래까지를
+    // 원래 창 높이로 알려 준다 (메인이 그만큼만 클릭을 잡고, 넘치면 책상을 올린다)
+    let bottom = 0;
+    for (const el of fitEls) bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
+    h = Math.ceil(bottom - (roam.homeY - APP_PAD_TOP) + APP_PAD_BOTTOM);
+  } else {
+    h = Math.ceil(appEl.getBoundingClientRect().height);
+  }
   if (h === lastFitH || !window.pet) return;
   lastFitH = h;
   window.pet.fit(h);
 }
 
-new ResizeObserver(reportFit).observe(appEl);
+const fitObserver = new ResizeObserver(reportFit);
+fitObserver.observe(appEl);
+for (const el of fitEls) fitObserver.observe(el); // 산책 중엔 패널이 #app 크기를 안 바꾼다
 reportFit();
