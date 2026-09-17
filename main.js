@@ -80,7 +80,7 @@ function startRoam() {
  * 메인이 받는 마우스 이벤트로 판단한다 */
 let roamHoverInside = false;
 function updateRoamHover() {
-  if (!roamHome || !win || win.isDestroyed()) return;
+  if (!roamHome || roamDragging || !win || win.isDestroyed()) return;
   const p = screen.getCursorScreenPoint();
   const h = roamHome;
   const inside = p.x >= h.x && p.x < h.x + h.width && p.y >= h.y && p.y < h.y + h.height;
@@ -89,11 +89,34 @@ function updateRoamHover() {
   win.setIgnoreMouseEvents(!inside, { forward: true });
 }
 
+/* 산책 중 책상 끌기 — 렌더러가 마우스 이동량을 보내면 원래 창 자리(roamHome)를
+ * 옮기고, 창 위쪽 경계가 바뀌면 창도 늘리거나 줄인 뒤 새 기하를 알려 준다.
+ * 끄는 동안은 커서가 원래 자리를 벗어나도 클릭 통과를 켜지 않는다 */
+let roamDragging = false;
+function moveDesk(dx, dy) {
+  if (!roamHome || !win || win.isDestroyed()) return;
+  const area = screen.getDisplayMatching(roamHome).workArea;
+  const h = roamHome;
+  h.x = clamp(h.x + dx, area.x, area.x + area.width - h.width);
+  h.y = clamp(h.y + dy, area.y, area.y + area.height - h.height);
+  const bottom = area.y + area.height;
+  const y = Math.min(h.y, bottom - 1);
+  const b = win.getBounds();
+  if (b.y !== y) win.setBounds({ x: area.x, y, width: area.width, height: bottom - y });
+  const canvasW = SCENE_W * settings.petPx;
+  win.webContents.send('roam-geo', {
+    heightPx: bottom - y,
+    homePx: h.x - area.x + Math.round((h.width - canvasW) / 2),
+    homeY: h.y - y + APP_PAD_TOP,
+  });
+}
+
 function endRoam() {
   if (!roamHome || !win || win.isDestroyed()) return;
   const home = roamHome;
   roamHome = null;
   roamHoverInside = false;
+  roamDragging = false;
   hideForRoamSwap();
   win.setIgnoreMouseEvents(false);
   win.setBounds(home);
@@ -685,6 +708,13 @@ ipcMain.on('fit', (_e, height) => {
 });
 
 ipcMain.on('roam', (_e, on) => (on ? startRoam() : endRoam()));
+ipcMain.on('desk-drag', (_e, on) => {
+  roamDragging = !!on;
+  if (!on) updateRoamHover();
+});
+ipcMain.on('desk-move', (_e, { dx, dy }) => {
+  if (Number.isFinite(dx) && Number.isFinite(dy)) moveDesk(Math.round(dx), Math.round(dy));
+});
 
 ipcMain.on('roam-ready', showAfterRoamSwap);
 

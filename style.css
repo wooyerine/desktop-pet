@@ -135,6 +135,7 @@ html, body {
 .roaming #hud { top: calc(var(--home-bottom) + 6px + 30px + 6px); }
 /* 화면 크기 캔버스에 그림자 필터를 걸면 GPU가 매 프레임 화면 전체를 흐린다 */
 .roaming #pet-canvas { -webkit-app-region: no-drag; cursor: default; filter: none; }
+.roaming.desk-hover #pet-canvas { cursor: grab; }
 
 /* ---- 하단 버튼 바 ---- */
 #bar {

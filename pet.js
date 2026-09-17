@@ -3847,6 +3847,61 @@ function startRoam(geo) {
   window.pet.roamReady();
 }
 
+/* 책상을 끌어 옮기는 중 — 메인이 새 기하를 보내면 책상 자리와 캔버스 높이를
+ * 맞추고, 바닥(캔버스 아래)이 움직인 만큼 펫도 같이 옮긴다 */
+function applyRoamGeo(geo) {
+  if (!roam.active) return;
+  const dh = geo.heightPx - roam.heightPx;
+  roam.heightPx = geo.heightPx;
+  roam.homePx = geo.homePx;
+  roam.homeY = geo.homeY;
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty('--home-cx', `${geo.homePx + SCENE_W * SCALE / 2}px`);
+  rootStyle.setProperty('--home-bottom', `${geo.homeY + SCENE_H * SCALE}px`);
+  if (dh) {
+    roam.y += dh;
+    roam.targetY += dh;
+    resizeCanvas();
+  }
+  if (roam.phase === 'returning' || roam.phase === 'home') {
+    const h = roamHomeAnchor();
+    roam.target = h.x;
+    roam.targetY = h.y;
+  }
+}
+
+const deskDrag = { on: false, x: 0, y: 0 };
+function inDeskRect(x, y) {
+  return x >= roam.homePx && x < roam.homePx + SCENE_W * SCALE &&
+    y >= roam.homeY && y < roam.homeY + SCENE_H * SCALE;
+}
+canvas.addEventListener('mousedown', (e) => {
+  if (!roam.active || e.button !== 0 || !inDeskRect(e.clientX, e.clientY)) return;
+  deskDrag.on = true;
+  deskDrag.x = e.screenX;
+  deskDrag.y = e.screenY;
+  if (window.pet && window.pet.deskDrag) window.pet.deskDrag(true);
+  e.preventDefault();
+});
+canvas.addEventListener('mousemove', (e) => {
+  if (!roam.active) return;
+  document.body.classList.toggle('desk-hover', deskDrag.on || inDeskRect(e.clientX, e.clientY));
+});
+window.addEventListener('mousemove', (e) => {
+  if (!deskDrag.on) return;
+  const dx = e.screenX - deskDrag.x;
+  const dy = e.screenY - deskDrag.y;
+  if (!dx && !dy) return;
+  deskDrag.x = e.screenX;
+  deskDrag.y = e.screenY;
+  window.pet.deskMove(dx, dy);
+});
+window.addEventListener('mouseup', () => {
+  if (!deskDrag.on) return;
+  deskDrag.on = false;
+  window.pet.deskDrag(false);
+});
+
 /* 메인이 창을 되돌린 뒤 null을 보내면 그때 원래 화면으로 — 그 전에 바꾸면
  * 넓은 창 왼쪽 위에 앉은 모습이 한 프레임 보인다 */
 function leaveRoam() {
@@ -3855,6 +3910,7 @@ function leaveRoam() {
   roam.requested = false;
   roam.phase = 'off';
   document.body.classList.remove('roaming');
+  document.body.classList.remove('desk-hover');
   resizeCanvas();
   render(performance.now());
   window.pet.roamReady();
@@ -4238,6 +4294,8 @@ if (window.pet) {
       state.lastMouse = now;
     }
   });
+
+  if (window.pet.onRoamGeo) window.pet.onRoamGeo(applyRoamGeo);
 
   // 돌아다니기 — 메인이 창을 넓히면 기하를 보내 주고, 되돌리면 null
   if (window.pet.onRoam) {
