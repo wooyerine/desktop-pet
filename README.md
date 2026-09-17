@@ -28,14 +28,22 @@
 
 ## 1. 설치
 
-[Releases](https://github.com/wooyerine/desktop-pet/releases)에서 받으세요.
-
 ### macOS (Apple Silicon, M1 이상)
 
-`.dmg`를 받아 `Desktop Pet.app`을 응용 프로그램에 드래그하면 끝이에요.
+**Homebrew** (추천 — "손상됨" 경고 없이 설치돼요):
 
-> ⚠️ 서명되지 않은 앱이라 처음 열 때 macOS가 **"손상되었기 때문에 열 수 없다"**며
-> 차단해요 (실제 손상 아님). 터미널에서 아래 한 줄을 실행한 뒤 다시 여세요:
+```bash
+brew tap wooyerine/tap
+brew trust wooyerine/tap   # 최신 Homebrew는 외부 tap을 한 번 신뢰해 줘야 해요
+brew install --cask desktop-pet
+```
+
+또는 [Releases](https://github.com/wooyerine/desktop-pet/releases)에서 `.dmg`를
+받아 `Desktop Pet.app`을 응용 프로그램에 드래그하세요.
+
+> ⚠️ dmg로 설치하면 서명되지 않은 앱이라 처음 열 때 macOS가 **"손상되었기 때문에
+> 열 수 없다"**며 차단해요 (실제 손상 아님). 터미널에서 아래 한 줄을 실행한 뒤
+> 다시 여세요:
 >
 > ```bash
 > xattr -cr "/Applications/Desktop Pet.app"
@@ -259,7 +267,7 @@ macOS는 zip을 받아 앱을 직접 교체한 뒤 재시작합니다. 메뉴바
 ### macOS: "손상되었기 때문에 열 수 없다"
 
 서명되지 않은 앱이라 뜨는 경고예요 (실제 손상 아님). [설치](#1-설치)의
-`xattr` 명령을 실행하세요.
+`xattr` 명령을 실행하거나, Homebrew로 설치하면 이 경고 없이 열려요.
 
 ### Windows: SmartScreen 경고
 
