@@ -2472,12 +2472,13 @@ const params = new URLSearchParams(location.search);
 const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating | sad
 
 /* ---- 돌아다니기 ----
- * 일하는 중이 아닐 때 30초 넘게 가만히 있으면 펫이 책상에서 일어나 화면 맨 아래
- * 가장자리를 바닥 삼아 좌우로 걸어 다닌다. 메인이 창을 "책상 위치부터 화면
+ * 일하는 중이 아니면 펫은 책상에 있지 않고 화면 맨 아래 가장자리를 바닥 삼아
+ * 좌우로 걸어 다닌다 (앱을 켜자마자, 일을 끝내자마자). 메인이 창을 "책상 위치부터 화면
  * 바닥까지" 화면 폭으로 넓히고 클릭이 통과되게 바꿔 주면, 책상은 원래
  * 자리(homePx, homeY)에 그대로 그리고 펫만 절반 크기로 옮겨 그린다.
- * 키보드나 마우스를 건드리면 책상으로 달려와 앉고 창이 원래대로 돌아온다 */
-const ROAM_AFTER = params.get('roam') ? 3000 : 30000; // 30초 가만히 있으면 나간다
+ * 일 시작·타이머·패널 열기·화면 잠금이면 책상으로 달려와 앉고 창이 원래대로
+ * 돌아온다. 버튼 바와 HUD는 책상 자리에 남아 있어서 산책 중에도 누를 수 있다 */
+const ROAM_START_DELAY = 800; // 앱이 뜨고 창 높이가 맞춰질 시간
 const roam = {
   active: false,
   requested: false, // 메인에 넓혀 달라고 보낸 뒤 답을 기다리는 중
@@ -3787,11 +3788,19 @@ function roamHomeAnchor() {
   return { x: roam.homePx + (PET_X + 10) * SCALE, y: roam.homeY + SCENE_H * SCALE };
 }
 
+function anyPanelOpen() {
+  return [panel, rankPanel, grassPanel, decoPanel, achPanel]
+    .some((p) => !p.classList.contains('hidden'));
+}
+
+/* 책상에 있어야 하는 이유 — 하나라도 있으면 돌아오고, 없으면 나간다 */
+function mustBeAtDesk() {
+  return game.working || state.locked || timer.running || anyPanelOpen();
+}
+
 function updateRoam(now) {
   if (roam.active) {
-    // 돌아올 이유: 사용자가 돌아왔다 / 일 시작 / 화면 잠금
-    const back = state.lastKey > roam.since || state.lastMouse > roam.since ||
-      game.working || state.locked || timer.running;
+    const back = mustBeAtDesk();
     if (back && roam.phase !== 'returning' && roam.phase !== 'home') {
       const h = roamHomeAnchor();
       roam.phase = 'returning';
@@ -3802,10 +3811,7 @@ function updateRoam(now) {
     return;
   }
   if (roam.requested || DEMO || !window.pet || !window.pet.roam) return;
-  if (game.working || state.locked || timer.running) return;
-  const idle = now - Math.max(state.lastKey, state.lastMouse, startTime);
-  if (params.get('roamdebug') && Math.floor(now / 1000) !== Math.floor((now - 80) / 1000)) console.log('[roam] idle', Math.round(idle), 'working', game.working, 'locked', state.locked, 'timer', timer.running);
-  if (idle < ROAM_AFTER) return;
+  if (mustBeAtDesk() || now - startTime < ROAM_START_DELAY) return;
   roam.requested = true;
   window.pet.roam(true);
 }
@@ -3826,6 +3832,10 @@ function startRoam(geo) {
   roam.lastT = now;
   roam.dir = 1;
   document.body.classList.add('roaming');
+  // 버튼 바와 HUD는 책상 자리에 남긴다 (캔버스 가운데 아래)
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty('--home-cx', `${geo.homePx + SCENE_W * SCALE / 2}px`);
+  rootStyle.setProperty('--home-bottom', `${geo.homeY + SCENE_H * SCALE}px`);
   resizeCanvas();
   // 먼저 책상 앞 바닥으로 뛰어 내려간 뒤 돌아다닌다 — 창이 높이 있어도 1초 남짓
   roam.target = h.x;
@@ -4228,6 +4238,14 @@ if (window.pet) {
       state.lastMouse = now;
     }
   });
+
+  // 돌아다니는 동안 창은 클릭이 통과된다 — 버튼 바·HUD 위에서만 잡는다
+  if (window.pet.clickThrough) {
+    for (const el of [document.getElementById('bar'), hudLevel.parentElement]) {
+      el.addEventListener('mouseenter', () => { if (roam.active) window.pet.clickThrough(false); });
+      el.addEventListener('mouseleave', () => { if (roam.active) window.pet.clickThrough(true); });
+    }
+  }
 
   // 돌아다니기 — 메인이 창을 넓히면 기하를 보내 주고, 되돌리면 null
   if (window.pet.onRoam) {
