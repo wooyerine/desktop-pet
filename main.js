@@ -55,6 +55,7 @@ const APP_PAD_TOP = 8; // style.css #app padding-top — 캔버스가 창 위에
  * 한 프레임 보인다. 바꾸는 동안 창을 투명하게 두고, 렌더러가 새 화면을 한 번
  * 그린 뒤 'roam-ready'를 보내면 다시 보이게 한다 */
 function startRoam() {
+  if (process.env.ROAMDEBUG) console.log('[roam] main startRoam, roamHome=', !!roamHome);
   if (roamHome || !win || win.isDestroyed()) return;
   const home = win.getBounds();
   const area = screen.getDisplayMatching(home).workArea;
@@ -155,6 +156,7 @@ function createWindow() {
   if (process.env.PET) q.push(`pet=${process.env.PET}`);
   if (process.env.NIGHT) q.push(`night=${process.env.NIGHT}`);
   if (process.env.ROAM) q.push(`roam=${process.env.ROAM}`);
+  if (process.env.ROAMDEBUG) q.push('roamdebug=1');
   if (process.env.VISITOR) q.push(`visitor=${process.env.VISITOR}`);
   if (process.env.DESK) q.push(`desk=${process.env.DESK}`);
   if (process.env.ACC) q.push(`acc=${process.env.ACC}`);

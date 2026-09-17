@@ -2472,12 +2472,12 @@ const params = new URLSearchParams(location.search);
 const DEMO = params.get('demo'); // typing | mousing | sleeping | celebrating | sad
 
 /* ---- 돌아다니기 ----
- * 일하는 중이 아닐 때 한참 가만히 있으면 펫이 책상에서 일어나 화면 맨 아래
+ * 일하는 중이 아닐 때 30초 넘게 가만히 있으면 펫이 책상에서 일어나 화면 맨 아래
  * 가장자리를 바닥 삼아 좌우로 걸어 다닌다. 메인이 창을 "책상 위치부터 화면
  * 바닥까지" 화면 폭으로 넓히고 클릭이 통과되게 바꿔 주면, 책상은 원래
  * 자리(homePx, homeY)에 그대로 그리고 펫만 절반 크기로 옮겨 그린다.
  * 키보드나 마우스를 건드리면 책상으로 달려와 앉고 창이 원래대로 돌아온다 */
-const ROAM_AFTER = params.get('roam') ? 3000 : 2 * 60000;
+const ROAM_AFTER = params.get('roam') ? 3000 : 30000; // 30초 가만히 있으면 나간다
 const roam = {
   active: false,
   requested: false, // 메인에 넓혀 달라고 보낸 뒤 답을 기다리는 중
@@ -3804,6 +3804,7 @@ function updateRoam(now) {
   if (roam.requested || DEMO || !window.pet || !window.pet.roam) return;
   if (game.working || state.locked || timer.running) return;
   const idle = now - Math.max(state.lastKey, state.lastMouse, startTime);
+  if (params.get('roamdebug') && Math.floor(now / 1000) !== Math.floor((now - 80) / 1000)) console.log('[roam] idle', Math.round(idle), 'working', game.working, 'locked', state.locked, 'timer', timer.running);
   if (idle < ROAM_AFTER) return;
   roam.requested = true;
   window.pet.roam(true);
