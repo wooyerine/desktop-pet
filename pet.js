@@ -2960,13 +2960,19 @@ function showToast(msg) {
 /* ================================================================
  * 업적 / 통계 — 레벨이 아닌 "행동"으로 열리는 히든 콘텐츠
  * ================================================================ */
+function nullableCount(v) {
+  return v === null || v === undefined || !Number.isFinite(+v) ? null : Math.max(0, Math.floor(+v));
+}
+
 function loadStats() {
   try {
     const s = JSON.parse(localStorage.getItem('petStats') || '{}');
     return {
       pomos: Math.max(0, Math.floor(+s.pomos) || 0),
-      // 없으면 null — 잔디/완주 횟수에서 한 번 채워 넣는다 (backfillPomoMinutes)
-      pomoMinutes: Number.isFinite(+s.pomoMinutes) && s.pomoMinutes !== null ? Math.max(0, Math.floor(+s.pomoMinutes)) : null,
+      // v2.3.0이 따로 세던 누적 분 — 이제는 옛 기록 보정(pomoLegacy)을 잡을 때 한 번만 쓴다
+      pomoMinutes: nullableCount(s.pomoMinutes),
+      // 잔디가 넉 달치만 남던 시절에 지워진 집중 시간(분). null = 아직 안 잡음 (ensurePomoLegacy)
+      pomoLegacy: nullableCount(s.pomoLegacy),
       keys: Math.max(0, Math.floor(+s.keys) || 0),
       early: !!s.early,
       top1: !!s.top1,
@@ -2978,7 +2984,7 @@ function loadStats() {
     };
   } catch (_) {
     return {
-      pomos: 0, pomoMinutes: null, keys: 0, early: false, top1: false, bestStreak: 0,
+      pomos: 0, pomoMinutes: null, pomoLegacy: null, keys: 0, early: false, top1: false, bestStreak: 0,
       visitors: {}, pomoMonths: {}, pomoEvents: {}, done: [],
     };
   }
@@ -2986,15 +2992,29 @@ function loadStats() {
 
 const stats = loadStats();
 
-/* v2.3 전에는 누적 시간을 따로 세지 않았다 — 남아 있는 잔디 합과
- * 완주 횟수 × 25분 중 큰 쪽으로 한 번 채운다 (잔디는 예전엔 넉 달치만 남겼다) */
-(function backfillPomoMinutes() {
-  if (stats.pomoMinutes !== null) return;
-  let grass = 0;
-  for (const days of [pomoMine, pomoOthers]) for (const v of Object.values(days)) grass += Math.max(0, +v) || 0;
-  stats.pomoMinutes = Math.max(grass, stats.pomos * POMO_UNIT);
-  try { localStorage.setItem('petStats', JSON.stringify(stats)); } catch (_) { /* 무시 */ }
-})();
+/* 뽀모도로 누적 시간(분) = 옛 기록 보정 + 모든 PC의 잔디 합.
+ * 잔디는 기기별로 쌓고 서버가 더해 주므로, 두 PC에서 동시에 해도 빠지는 몫이 없다 */
+function totalGrassMinutes() {
+  let n = 0;
+  for (const days of [pomoMine, pomoOthers]) for (const v of Object.values(days)) n += Math.max(0, +v) || 0;
+  return n;
+}
+
+function totalPomoMinutes() {
+  return (stats.pomoLegacy || 0) + totalGrassMinutes();
+}
+
+/* 잔디가 넉 달치만 남던 시절(v2.3.0 전)에 지워진 몫을 한 번만 잡아 고정한다 —
+ * v2.3.0이 센 누적 분(없으면 완주 횟수 × 25분)에서 지금 남은 잔디를 뺀 만큼.
+ * 다른 PC 잔디를 받기 전에 잡으면 그만큼 부풀어 두 번 세므로, 동기화하는 사람은
+ * 서버에서 잔디를 받아 온 뒤에 부른다. 다른 PC가 먼저 잡았으면 서버 값을 받아 쓴다 */
+function ensurePomoLegacy() {
+  if (stats.pomoLegacy !== null) return;
+  const base = stats.pomoMinutes !== null ? stats.pomoMinutes : stats.pomos * POMO_UNIT;
+  stats.pomoLegacy = Math.max(0, base - totalGrassMinutes());
+  saveStats();
+  checkAchievements();
+}
 
 let statsPushTimer = null;
 function saveStats() {
@@ -3010,7 +3030,12 @@ function saveStats() {
 function adoptStats(r) {
   if (!r || typeof r !== 'object') return;
   const before = JSON.stringify(stats);
-  for (const k of ['pomos', 'pomoMinutes', 'keys', 'bestStreak']) stats[k] = Math.max(stats[k], Math.floor(+r[k]) || 0);
+  for (const k of ['pomos', 'keys', 'bestStreak']) stats[k] = Math.max(stats[k], Math.floor(+r[k]) || 0);
+  // null(아직 안 잡음)은 null끼리만 남는다 — 한쪽이라도 잡았으면 큰 쪽
+  for (const k of ['pomoMinutes', 'pomoLegacy']) {
+    const v = nullableCount(r[k]);
+    if (v !== null) stats[k] = Math.max(stats[k] || 0, v);
+  }
   for (const k of ['early', 'top1']) stats[k] = stats[k] || !!r[k];
   for (const key of ['visitors', 'pomoMonths', 'pomoEvents']) {
     if (!r[key] || typeof r[key] !== 'object') continue;
@@ -3089,7 +3114,7 @@ const ACHIEVEMENTS = {
 };
 
 function pomoHours() {
-  return Math.floor(stats.pomoMinutes / 60);
+  return Math.floor(totalPomoMinutes() / 60);
 }
 
 /* 보상은 하나(문자열)일 수도, 세트(배열)일 수도 있다 — 소품/스킨 어느 쪽이든 */
@@ -3389,6 +3414,7 @@ async function pushScore({ interactive = false } = {}) {
       try { localStorage.setItem('lastPushAt', res.updated_at); } catch (_) { /* 무시 */ }
     }
     if (res) adoptOthers(res.pomo_others);
+    if (res && res.pomo_others) ensurePomoLegacy(); // 시작할 때 오프라인이었으면 여기서
     return true;
   } catch (err) {
     console.error('점수 업로드 실패:', err.message);
@@ -3486,6 +3512,7 @@ async function syncOnStart() {
     // 잔디는 레벨보다 먼저 받는다 — 이 PC가 최신이어도 다른 PC가 심어 둔 날이 있을 수 있다
     adoptOthers(res.pomo_others);
     adoptStats(res.stats); // 업적도 마찬가지 — 최신 PC와 무관하게 합친다
+    if (res.pomo_others) ensurePomoLegacy(); // 다른 PC 잔디까지 받은 뒤라야 정확하다
     const lastPush = localStorage.getItem('lastPushAt') || '';
     // 같은 서버가 찍은 ISO 타임스탬프라 문자열 비교로 충분
     if (lastPush && res.updated_at <= lastPush) return; // 이 PC가 최신
@@ -4651,7 +4678,6 @@ function finishTimer() {
     pushScore(); // 다른 PC에서도 보이게 바로 올린다
     // 업적 통계 — 완주 횟수, 월별/이벤트 기간 횟수, 최고 연속 기록
     stats.pomos += 1;
-    stats.pomoMinutes += timer.minutes;
     const mk = k.slice(0, 7); // 'YYYY-MM'
     stats.pomoMonths[mk] = (stats.pomoMonths[mk] || 0) + 1;
     for (const [id, a] of Object.entries(ACHIEVEMENTS)) {
@@ -5207,6 +5233,8 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 
 updateHud();
 updateCodeRow();
+// 동기화를 안 하면 합칠 다른 PC 잔디가 없으니 바로 잡는다
+if (SANDBOX || !nickname || !syncCode) ensurePomoLegacy();
 syncOnStart();
 
 // 시작할 때 한 번 — 연속 기록을 갱신하고, 이미 채운 업적이 있으면 열어 준다

@@ -2,7 +2,7 @@
 -- (v9에서 바뀐 것: 잔디를 지우지 않고 영구 보관 — 기기 칸을 통째로 갈아 끼우던 걸
 --  덮어 합치기로. 앱은 최근 몇 달치만 올리고, 그 전 날짜는 서버에 남는다.
 --  기기가 10대를 넘으면 밀려나는 기기 기록은 'archive' 칸에 더해 둔다.
---  통계에 pomoMinutes(뽀모도로 누적 분)·pomoEvents(이벤트 기간별 완주 수 { 'eventGhost-2026': n }),
+--  통계에 pomoMinutes(v2.3.0의 누적 분)·pomoLegacy(v2.3.1+: 누적 시간 = 이것 + 잔디 합)·pomoEvents(이벤트 기간별 완주 수 { 'eventGhost-2026': n }),
 --  꾸미기에 screen(모니터 캐릭터))
 -- (v8에서 바뀐 것: total_xp / week_key / week_xp 칼럼 — 이번 주에 얻은 경험치를
 --  서버가 세어 두어, 누적 레벨과 별개로 "이번 주" 랭킹을 보여 준다)
@@ -180,7 +180,7 @@ as $$
   ),
   num as (
     select jsonb_object_agg(k, to_jsonb(least(greatest((j -> k #>> '{}')::numeric, 0), 100000000)::int)) as v
-    from src, unnest(array['pomos', 'pomoMinutes', 'keys', 'bestStreak']) k
+    from src, unnest(array['pomos', 'pomoMinutes', 'pomoLegacy', 'keys', 'bestStreak']) k
     where jsonb_typeof(j -> k) = 'number'
   ),
   bool as (
@@ -223,6 +223,9 @@ as $$
   select jsonb_build_object(
     'pomos', greatest(coalesce((sa.j ->> 'pomos')::int, 0), coalesce((sb.j ->> 'pomos')::int, 0)),
     'pomoMinutes', greatest(coalesce((sa.j ->> 'pomoMinutes')::int, 0), coalesce((sb.j ->> 'pomoMinutes')::int, 0)),
+    -- 옛 기록 보정: 아직 아무 PC도 안 잡았으면 null로 둔다 (0이면 "보정 없음"으로 굳어 버린다).
+    -- greatest는 null을 건너뛴다
+    'pomoLegacy', greatest((sa.j ->> 'pomoLegacy')::int, (sb.j ->> 'pomoLegacy')::int),
     'keys', greatest(coalesce((sa.j ->> 'keys')::int, 0), coalesce((sb.j ->> 'keys')::int, 0)),
     'bestStreak', greatest(coalesce((sa.j ->> 'bestStreak')::int, 0), coalesce((sb.j ->> 'bestStreak')::int, 0)),
     'early', coalesce((sa.j ->> 'early')::boolean, false) or coalesce((sb.j ->> 'early')::boolean, false),
