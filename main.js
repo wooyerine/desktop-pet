@@ -219,6 +219,8 @@ function createWindow() {
   if (process.env.SKIN) q.push(`skin=${process.env.SKIN}`);
   if (process.env.DESKSTYLE) q.push(`deskstyle=${process.env.DESKSTYLE}`);
   if (process.env.KB) q.push(`kb=${process.env.KB}`);
+  if (process.env.SCREEN) q.push(`screen=${process.env.SCREEN}`);
+  if (process.env.EVOLVE) q.push(`evolve=${process.env.EVOLVE}`);
   if (process.env.PREVIEW) q.push(`preview=${process.env.PREVIEW}`);
   if (process.env.LEVEL) q.push(`lv=${process.env.LEVEL}`);
   if (process.env.ACH) q.push(`ach=${process.env.ACH}`);

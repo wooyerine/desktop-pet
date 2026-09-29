@@ -249,6 +249,18 @@ button:active {
   font-weight: bold;
   color: #1c1c1c;
 }
+.grass-head #grass-streak { margin-left: auto; margin-right: 6px; }
+.grass-nav { display: flex; gap: 2px; }
+.grass-nav button {
+  font: inherit;
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 4px;
+  border: 2px solid #1c1c1c;
+  background: #ffffff;
+  cursor: pointer;
+}
+.grass-nav button:disabled { opacity: 0.3; cursor: default; }
 .grass-legend {
   display: flex;
   align-items: center;

@@ -1,4 +1,9 @@
--- 리더보드 스키마 v8 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기 + 업적 + 주간 랭킹
+-- 리더보드 스키마 v9 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기 + 업적 + 주간 랭킹
+-- (v9에서 바뀐 것: 잔디를 지우지 않고 영구 보관 — 기기 칸을 통째로 갈아 끼우던 걸
+--  덮어 합치기로. 앱은 최근 몇 달치만 올리고, 그 전 날짜는 서버에 남는다.
+--  기기가 10대를 넘으면 밀려나는 기기 기록은 'archive' 칸에 더해 둔다.
+--  통계에 pomoMinutes(뽀모도로 누적 분)·pomoEvents(이벤트 기간별 완주 수 { 'eventGhost-2026': n }),
+--  꾸미기에 screen(모니터 캐릭터))
 -- (v8에서 바뀐 것: total_xp / week_key / week_xp 칼럼 — 이번 주에 얻은 경험치를
 --  서버가 세어 두어, 누적 레벨과 별개로 "이번 주" 랭킹을 보여 준다)
 -- (v7: stats 칼럼 — 업적 통계를 서버에서 합친다)
@@ -44,7 +49,7 @@ alter table public.leaderboard
 alter table public.leaderboard
   add column if not exists deco jsonb not null default '{}'::jsonb;
 
--- v6 → v7: 업적 통계 { pomos, keys, early, top1, bestStreak, visitors, pomoMonths, done }
+-- v6 → v7: 업적 통계 { pomos, pomoMinutes(v9), keys, early, top1, bestStreak, visitors, pomoMonths, done }
 -- 기기마다 따로 세던 걸 서버에서 합친다 — 카운터는 큰 쪽, 업적/도감은 합집합
 alter table public.leaderboard
   add column if not exists stats jsonb not null default '{}'::jsonb;
@@ -159,7 +164,7 @@ as $$
   from jsonb_each(
     case when jsonb_typeof(coalesce(p_deco, 'null'::jsonb)) = 'object' then p_deco else '{}'::jsonb end
   )
-  where key in ('desk', 'acc', 'skin', 'deskStyle', 'kb')
+  where key in ('desk', 'acc', 'skin', 'deskStyle', 'kb', 'screen')
     and jsonb_typeof(value) = 'string'
     and length(value #>> '{}') between 1 and 64; -- acc는 "glasses,scarf"처럼 여러 개를 쉼표로 잇는다
 $$;
@@ -175,7 +180,7 @@ as $$
   ),
   num as (
     select jsonb_object_agg(k, to_jsonb(least(greatest((j -> k #>> '{}')::numeric, 0), 100000000)::int)) as v
-    from src, unnest(array['pomos', 'keys', 'bestStreak']) k
+    from src, unnest(array['pomos', 'pomoMinutes', 'keys', 'bestStreak']) k
     where jsonb_typeof(j -> k) = 'number'
   ),
   bool as (
@@ -193,13 +198,18 @@ as $$
     from src, jsonb_each(case when jsonb_typeof(j -> 'pomoMonths') = 'object' then j -> 'pomoMonths' else '{}'::jsonb end)
     where key ~ '^\d{4}-\d{2}$' and jsonb_typeof(value) = 'number'
   ),
+  evt as (
+    select jsonb_build_object('pomoEvents', coalesce(jsonb_object_agg(key, to_jsonb(least(greatest((value #>> '{}')::numeric, 0), 100000)::int)), '{}'::jsonb)) as v
+    from src, jsonb_each(case when jsonb_typeof(j -> 'pomoEvents') = 'object' then j -> 'pomoEvents' else '{}'::jsonb end)
+    where key ~ '^[A-Za-z0-9]{1,32}-\d{4}$' and jsonb_typeof(value) = 'number'
+  ),
   done as (
     select jsonb_build_object('done', coalesce(jsonb_agg(distinct e), '[]'::jsonb)) as v
     from src, jsonb_array_elements_text(case when jsonb_typeof(j -> 'done') = 'array' then j -> 'done' else '[]'::jsonb end) e
     where e ~ '^[A-Za-z0-9]{1,32}$'
   )
   select coalesce((select v from num), '{}'::jsonb) || coalesce((select v from bool), '{}'::jsonb)
-      || (select v from vis) || (select v from mon) || (select v from done);
+      || (select v from vis) || (select v from mon) || (select v from evt) || (select v from done);
 $$;
 
 -- 두 기기의 통계 합치기 — 카운터는 큰 쪽, 불리언은 or, 도감/월별은 키마다 큰 쪽, 업적은 합집합.
@@ -212,6 +222,7 @@ as $$
   with sa as (select public.clean_stats(a) j), sb as (select public.clean_stats(b) j)
   select jsonb_build_object(
     'pomos', greatest(coalesce((sa.j ->> 'pomos')::int, 0), coalesce((sb.j ->> 'pomos')::int, 0)),
+    'pomoMinutes', greatest(coalesce((sa.j ->> 'pomoMinutes')::int, 0), coalesce((sb.j ->> 'pomoMinutes')::int, 0)),
     'keys', greatest(coalesce((sa.j ->> 'keys')::int, 0), coalesce((sb.j ->> 'keys')::int, 0)),
     'bestStreak', greatest(coalesce((sa.j ->> 'bestStreak')::int, 0), coalesce((sb.j ->> 'bestStreak')::int, 0)),
     'early', coalesce((sa.j ->> 'early')::boolean, false) or coalesce((sb.j ->> 'early')::boolean, false),
@@ -223,6 +234,10 @@ as $$
     'pomoMonths', (select coalesce(jsonb_object_agg(key, mx), '{}'::jsonb) from (
                      select key, max((value #>> '{}')::int) mx
                      from (select * from jsonb_each(sa.j -> 'pomoMonths') union all select * from jsonb_each(sb.j -> 'pomoMonths')) t
+                     group by key) g),
+    'pomoEvents', (select coalesce(jsonb_object_agg(key, mx), '{}'::jsonb) from (
+                     select key, max((value #>> '{}')::int) mx
+                     from (select * from jsonb_each(sa.j -> 'pomoEvents') union all select * from jsonb_each(sb.j -> 'pomoEvents')) t
                      group by key) g),
     'done', (select coalesce(jsonb_agg(distinct e), '[]'::jsonb) from (
                select * from jsonb_array_elements_text(sa.j -> 'done') union select * from jsonb_array_elements_text(sb.j -> 'done')) u(e))
@@ -318,21 +333,35 @@ begin
   select * into v_row from public.leaderboard
     where lower(nickname) = lower(v_nick);
 
-  -- 이 기기 칸만 통째로 갈아 끼운다. 그 기기의 기록은 그 기기가 정답이고,
+  -- 이 기기 칸에만 덮어 합친다. 올라온 날짜는 그 기기가 정답이라 그대로 쓰고,
+  -- 올라오지 않은 옛날 날짜(앱은 최근 몇 달치만 올린다)는 서버에 있던 걸 남긴다.
   -- 다른 기기 칸은 건드리지 않으므로 합계에서 빠지거나 두 번 세지 않는다
   v_devices := coalesce(v_row.pomo_by_device, '{}'::jsonb);
-  if p_device is not null and p_device <> '' and length(p_device) <= 64 and p_pomo is not null then
-    v_devices := jsonb_set(v_devices, array[p_device], public.clean_pomo(p_pomo));
-    -- 기기 수 제한 (최근에 쓴 순으로 10대)
-    if (select count(*) from jsonb_object_keys(v_devices)) > 10 then
-      select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) into v_devices
-      from (
-        select key, value,
-               (select max(k) from jsonb_object_keys(value) k) as last_day
+  if p_device is not null and p_device <> '' and p_device <> 'archive'
+     and length(p_device) <= 64 and p_pomo is not null then
+    v_devices := jsonb_set(v_devices, array[p_device],
+      coalesce(v_devices -> p_device, '{}'::jsonb) || public.clean_pomo(p_pomo));
+    -- 기기 수 제한 (최근에 쓴 순으로 10대). 밀려난 기기의 기록은 버리지 않고
+    -- 'archive' 칸에 날짜별로 더해 둔다 — 합계(sum_pomo)에는 그대로 잡힌다
+    if (select count(*) from jsonb_object_keys(v_devices) k where k <> 'archive') > 10 then
+      with ranked as (
+        select key, value, row_number() over (
+                 order by (key = p_device) desc,
+                          (select max(k) from jsonb_object_keys(value) k) desc nulls last) as rn
         from jsonb_each(v_devices)
-        order by (key = p_device) desc, last_day desc nulls last
-        limit 10
-      ) t;
+        where key <> 'archive'
+      ),
+      old as (
+        select d.key as day, sum((d.value #>> '{}')::int) as total
+        from (select value from ranked where rn > 10
+              union all
+              select coalesce(v_devices -> 'archive', '{}'::jsonb)) o,
+             lateral jsonb_each(o.value) d
+        group by d.key
+      )
+      select coalesce((select jsonb_object_agg(key, value) from ranked where rn <= 10), '{}'::jsonb)
+          || jsonb_build_object('archive', coalesce((select jsonb_object_agg(day, total) from old), '{}'::jsonb))
+        into v_devices;
     end if;
   end if;
 

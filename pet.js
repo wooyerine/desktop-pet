@@ -1851,7 +1851,7 @@ const DESK_ITEMS = {
     },
   },
   pumpkin: {
-    label: '펌킨 조명', emoji: '🎃', lv: 1, ach: 'eventGhost', season: ['09', '10'],
+    label: '펌킨 조명', emoji: '🎃', lv: 1, ach: 'eventGhost', season: ['10'],
     draw: (now) => {
       sprite4(PUMPKIN, 4, 24);
       // 촛불이 일렁이듯 눈코입이 가끔 어두워진다
@@ -1864,7 +1864,7 @@ const DESK_ITEMS = {
     glow: drawPumpkinGlow, // 밤 오버레이 위에 다시 그려 빛이 살아 있게
   },
   vase: {
-    label: '벚꽃 화병', emoji: '🌸', lv: 1, ach: 'eventBlossom', season: ['04', '05'],
+    label: '벚꽃 화병', emoji: '🌸', lv: 1, ach: 'eventVase', season: ['05'],
     draw: (now) => {
       sprite4(VASE, 4, 23);
       // 가지 세 갈래
@@ -1880,7 +1880,7 @@ const DESK_ITEMS = {
     },
   },
   tree: {
-    label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce', season: ['11', '12'],
+    label: '크리스마스 트리', emoji: '🎄', lv: 1, ach: 'eventIce', season: ['12'],
     draw: (now) => {
       sprite4(TREE, 3, 19);
       // 전구처럼 오너먼트 두 그룹이 번갈아 켜지고 별도 반짝인다
@@ -2228,7 +2228,7 @@ const SKINS = {
   // ---- 계절 이벤트 스킨 — 레벨이 아니라 이벤트 업적으로 해제.
   // season의 달에만 입을 수 있다 — 철 지나면 자동으로 벗고, 다음 해에 미션 없이 다시 입는다 ----
   ghost: {
-    label: '유령', emoji: '👻', lv: 1, ach: 'eventGhost', season: ['09', '10'],
+    label: '유령', emoji: '👻', lv: 1, ach: 'eventGhost', season: ['10'],
     // 반투명 — 뒤의 바탕화면이 비쳐 보인다
     colors: {
       base: 'rgba(235,238,250,0.55)',
@@ -2237,12 +2237,12 @@ const SKINS = {
     },
   },
   ice: {
-    label: '아이스', emoji: '❄️', lv: 1, ach: 'eventIce', season: ['11', '12'],
+    label: '아이스', emoji: '❄️', lv: 1, ach: 'eventIce', season: ['12'],
     colors: { base: '#cfe8f2', shade: '#8fc3d9', light: '#f0fafd' },
     sparkle: '#ffffff',
   },
   blossom: {
-    label: '벚꽃', emoji: '🌸', lv: 1, ach: 'eventBlossom', season: ['04', '05'],
+    label: '벚꽃', emoji: '🌸', lv: 1, ach: 'eventBlossom', season: ['04'],
     colors: { base: '#f9d3dc', shade: '#e8a4b6', light: '#fff0f4' },
     perPet: { rabbit: { base: '#fbe3ea', shade: '#e8a4b6' } },
     sparkle: '#ffffff',
@@ -2324,6 +2324,147 @@ const CLAWD = [
   '..a.a..a.a..',
   '..a.a..a.a..',
 ];
+
+/* 뽀모도로 누적 시간 히든 업적으로 모니터 속 캐릭터가 토마토 스프를 마시고 진화한다
+ *  클로드 → (100시간) 빨간 유령 → (300시간) 공룡 → (1000시간) 인베이더.
+ *  프레임이 둘이면 [평소, 타이핑/움직임] 순서. 색은 스프라이트마다 따로 둔다 */
+const SCREEN_GHOST = [
+  '...oooo...',
+  '.oooooooo.',
+  'oooooooooo',
+  'oWWooooWWo',
+  'okWooookWo',
+  'oooooooooo',
+  'oooooooooo',
+  'oooooooooo',
+];
+const SCREEN_GHOST_SKIRT = [['o.oo..oo.o'], ['.oo.oo.oo.']];
+const SCREEN_DINO = [
+  '......oooooo',
+  '.....oo.oooo',
+  '.....ooooooo',
+  '.....oooo...',
+  'o...ooooo...',
+  'oo.ooooooo..',
+  'oooooooo....',
+  '.oooooo.....',
+  '..ooooo.....',
+];
+const SCREEN_DINO_LEGS = [['..oo.oo.....', '..o...o.....'], ['..o..oo.....', '..oo........']];
+const SCREEN_INVADER = [[
+  '..o.....o..',
+  '...o...o...',
+  '..ooooooo..',
+  '.oo.ooo.oo.',
+  'ooooooooooo',
+  'o.ooooooo.o',
+  'o.o.....o.o',
+  '...oo.oo...',
+], [
+  '..o.....o..',
+  'o..o...o..o',
+  'o.ooooooo.o',
+  'ooo.ooo.ooo',
+  'ooooooooooo',
+  '.ooooooooo.',
+  '..o.....o..',
+  '.o.......o.',
+]];
+
+/* 색이 스프라이트마다 따로인 버전 — 매 프레임 그리므로 같은 색 가로 줄은 한 번에 칠하고,
+ * 색이 바뀔 때만 fillStyle을 건드린다 (캔버스 호출은 전부 프레임 해시를 거친다) */
+function spriteC(grid, ox, oy, colors) {
+  let last = null;
+  for (let y = 0; y < grid.length; y++) {
+    const row = grid[y];
+    for (let x = 0; x < row.length;) {
+      const c = colors[row[x]];
+      let w = 1;
+      while (x + w < row.length && row[x + w] === row[x]) w++;
+      if (c) {
+        if (c !== last) { ctx.fillStyle = c; last = c; }
+        ctx.fillRect((ox + x) * HALF, (oy + y) * HALF, w * HALF, HALF);
+      }
+      x += w;
+    }
+  }
+}
+
+const GHOST_COL = { o: '#e8534a', W: '#ffffff', k: '#2b3a8f' };
+const DINO_COL = { o: '#535353' };
+const INVADER_COL = { o: '#2d2640' };
+const BOWL_COL = { R: '#d9534f', W: '#f4e6c8' };
+
+const SCREEN_ITEMS = {
+  clawd: {
+    label: '클로드', emoji: '🖥️', lv: 1,
+    draw: (now, typing) => sprite4(CLAWD, 70, 13 + (typing && Math.floor(now / 240) % 2 ? -1 : 0)),
+  },
+  redGhost: {
+    label: '빨간 유령', emoji: '👻', lv: 1, ach: 'soup100',
+    draw: (now, typing) => {
+      const y = 13 + (typing && Math.floor(now / 240) % 2 ? -1 : 0);
+      spriteC(SCREEN_GHOST, 71, y, GHOST_COL);
+      spriteC(SCREEN_GHOST_SKIRT[Math.floor(now / (typing ? 160 : 400)) % 2], 71, y + 8, GHOST_COL);
+    },
+  },
+  dino: {
+    label: '공룡', emoji: '🦖', lv: 1, ach: 'soup300',
+    draw: (now, typing) => {
+      spriteC(SCREEN_DINO, 70, 12, DINO_COL);
+      // 타이핑하면 달리고, 아니면 가만히 서 있다
+      spriteC(SCREEN_DINO_LEGS[typing ? Math.floor(now / 120) % 2 : 0], 70, 21, DINO_COL);
+    },
+  },
+  invader: {
+    label: '인베이더', emoji: '👾', lv: 1, ach: 'soup1000',
+    draw: (now, typing) => {
+      spriteC(SCREEN_INVADER[Math.floor(now / (typing ? 200 : 700)) % 2], 70, 14, INVADER_COL);
+    },
+  },
+};
+
+// 진화 연출 — 스프 그릇이 올라오고, 홀짝홀짝 마시고, 번쩍이며 바뀐다
+const EVOLVE_MS = 5000;
+const screenFx = { from: null, to: null, start: 0, until: 0 };
+const SOUP_BOWL = ['RRRRR', 'WWWWW', '.WWW.'];
+const SOUP_BOWL_EMPTY = ['.....', 'WWWWW', '.WWW.'];
+
+function evolveScreen(to) {
+  const now = performance.now();
+  screenFx.from = SCREEN_ITEMS[screenChar] ? screenChar : 'clawd';
+  screenFx.to = to;
+  screenFx.start = now;
+  screenFx.until = now + EVOLVE_MS;
+  screenChar = to;
+  try { localStorage.setItem('screenChar', to); } catch (_) { /* 무시 */ }
+  queueDecoPush();
+}
+
+function drawScreenChar(now, typing) {
+  const t = now - screenFx.start;
+  if (t < 0 || now >= screenFx.until || !SCREEN_ITEMS[screenFx.to]) { // t < 0: 친구 책상 미리보기(now = 0)
+    (SCREEN_ITEMS[screenChar] || SCREEN_ITEMS.clawd).draw(now, typing);
+    return;
+  }
+  const from = SCREEN_ITEMS[screenFx.from] || SCREEN_ITEMS.clawd;
+  const to = SCREEN_ITEMS[screenFx.to];
+  if (t < 2800) {
+    // 그릇이 아래에서 올라와 입가에 닿고, 한 모금씩 줄어든다
+    from.draw(now, t > 1200 && Math.floor(t / 300) % 2 === 0);
+    const y = t < 1200 ? 24 - Math.round((t / 1200) * 3) : 21;
+    const sips = t < 1200 ? 0 : Math.floor((t - 1200) / 550);
+    spriteC(sips >= 3 ? SOUP_BOWL_EMPTY : SOUP_BOWL, 74, y, BOWL_COL);
+    if (sips < 3 && Math.floor(now / 250) % 2) px4(75 + (Math.floor(now / 500) % 3), y - 1, '#ffffff'); // 김
+  } else if (t < 3800) {
+    // 번쩍번쩍 — 전과 후가 번갈아 보이다가
+    if (Math.floor(t / 120) % 2) rect4(68, 11, 16, 13, '#ffffff');
+    else (Math.floor(t / 240) % 2 ? to : from).draw(now, false);
+  } else {
+    to.draw(now, true); // 새 모습으로 신나서 폴짝
+    if (Math.floor(now / 200) % 2) { px4(69, 12, 'y'); px4(82, 13, 'y'); px4(70, 22, 'y'); }
+  }
+}
 
 const Z_SMALL = ['zzz', '.z.', 'zzz'];
 const Z_BIG = ['zzzz', '..z.', '.z..', 'zzzz'];
@@ -2407,9 +2548,18 @@ function drawMonitor(now, typing) {
   rect4(68, 11, 16, 13, 'v');  // 민트 화면
   rect4(73, 26, 6, 3, 'k');    // 스탠드
   rect4(70, 29, 12, 3, 'k');   // 받침
-  // 화면 속 클로드 — 고양이가 타이핑하면 신나서 폴짝폴짝
-  const hop = typing && Math.floor(now / 240) % 2 ? -1 : 0;
-  sprite4(CLAWD, 70, 13 + hop);
+  // 화면 속 캐릭터 — 고양이가 타이핑하면 신나서 폴짝폴짝.
+  // 캐릭터는 늘 화면 안에 들어가고, 삐져나오는 건 진화 연출의 스프 그릇뿐이라 그때만 자른다
+  if (now < screenFx.until) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(68 * HALF, 11 * HALF, 16 * HALF, 13 * HALF);
+    ctx.clip();
+    drawScreenChar(now, typing);
+    ctx.restore();
+  } else {
+    drawScreenChar(now, typing);
+  }
 }
 
 // 기계식 키보드의 파스텔 키캡 색 (열마다 순환)
@@ -2540,6 +2690,8 @@ let deskStyle = params.get('deskstyle') || localStorage.getItem('deskStyle') || 
 if (!DESK_STYLES[deskStyle]) deskStyle = 'basic';
 let kbStyle = params.get('kb') || localStorage.getItem('kbStyle') || 'basic';
 if (!KB_ITEMS[kbStyle]) kbStyle = 'basic';
+let screenChar = params.get('screen') || localStorage.getItem('screenChar') || 'clawd';
+if (!SCREEN_ITEMS[screenChar]) screenChar = 'clawd';
 
 const startTime = performance.now();
 
@@ -2582,8 +2734,8 @@ function updateNag(now) {
  *  { '2026-07-31': 75 } 형태. 여러 PC를 오가도 하루치가 합산되도록
  *  기기별로 나눠 저장하고 서버가 더한다 (깃허브 잔디처럼)
  * ================================================================ */
-const GRASS_WEEKS = 16;                // 패널에 보여줄 주 수
-const GRASS_KEEP_DAYS = GRASS_WEEKS * 7 + 14;
+const GRASS_WEEKS = 16;                // 패널에 보여줄 주 수 (◀로 그 전 16주씩 넘겨 본다)
+const GRASS_SYNC_DAYS = GRASS_WEEKS * 7 + 14; // 업로드는 최근 것만 — 서버가 옛날 칸을 그대로 쌓아 둔다
 const POMO_MIN_MINUTES = 10;           // 1분 타이머로 잔디를 심는 어뷰징 방지
 const POMO_UNIT = 25;                  // 색 한 단계 = 25분 (기본 뽀모도로 길이)
 const DAY_MS = 86400000;
@@ -2618,18 +2770,19 @@ if (!deviceId) {
   try { localStorage.setItem('deviceId', deviceId); } catch (_) { /* 무시 */ }
 }
 
-function pruneDays(days) {
-  const cutoff = dayKey(new Date(Date.now() - GRASS_KEEP_DAYS * DAY_MS));
-  for (const k of Object.keys(days)) if (k < cutoff) delete days[k]; // 'YYYY-MM-DD'는 문자열 비교로 충분
-  return days;
+/* 잔디는 지우지 않고 다 남긴다 (하루 한 칸이라 몇 년치도 몇십 KB).
+ * 서버에는 최근 것만 올린다 — 서버가 이 기기 칸에 덮어 합치므로 옛날 날짜는 거기 남아 있다 */
+function recentDays(days) {
+  const cutoff = dayKey(new Date(Date.now() - GRASS_SYNC_DAYS * DAY_MS));
+  return Object.fromEntries(Object.entries(days).filter(([k]) => k >= cutoff)); // 'YYYY-MM-DD'는 문자열 비교로 충분
 }
 
 function savePomoMine() {
-  try { localStorage.setItem('pomoMine', JSON.stringify(pruneDays(pomoMine))); } catch (_) { /* 무시 */ }
+  try { localStorage.setItem('pomoMine', JSON.stringify(pomoMine)); } catch (_) { /* 무시 */ }
 }
 
 function savePomoOthers() {
-  try { localStorage.setItem('pomoOthers', JSON.stringify(pruneDays(pomoOthers))); } catch (_) { /* 무시 */ }
+  try { localStorage.setItem('pomoOthers', JSON.stringify(pomoOthers)); } catch (_) { /* 무시 */ }
 }
 
 // v1.3.0은 "하루에 완주한 개수"를 셌다 — 한 개를 기본 뽀모도로 길이로 환산해 옮긴다
@@ -2672,7 +2825,7 @@ function grassLevel(minutes) {
 function currentStreak() {
   const start = dayMinutes(new Date()) ? 0 : 1;
   let n = 0;
-  for (let i = start; i < GRASS_KEEP_DAYS; i++) {
+  for (let i = start; i < 3660; i++) {
     if (!dayMinutes(daysAgo(i))) break;
     n++;
   }
@@ -2812,23 +2965,36 @@ function loadStats() {
     const s = JSON.parse(localStorage.getItem('petStats') || '{}');
     return {
       pomos: Math.max(0, Math.floor(+s.pomos) || 0),
+      // 없으면 null — 잔디/완주 횟수에서 한 번 채워 넣는다 (backfillPomoMinutes)
+      pomoMinutes: Number.isFinite(+s.pomoMinutes) && s.pomoMinutes !== null ? Math.max(0, Math.floor(+s.pomoMinutes)) : null,
       keys: Math.max(0, Math.floor(+s.keys) || 0),
       early: !!s.early,
       top1: !!s.top1,
       bestStreak: Math.max(0, Math.floor(+s.bestStreak) || 0),
       visitors: s.visitors && typeof s.visitors === 'object' ? s.visitors : {},
       pomoMonths: s.pomoMonths && typeof s.pomoMonths === 'object' ? s.pomoMonths : {},
+      pomoEvents: s.pomoEvents && typeof s.pomoEvents === 'object' ? s.pomoEvents : {},
       done: Array.isArray(s.done) ? s.done : [],
     };
   } catch (_) {
     return {
-      pomos: 0, keys: 0, early: false, top1: false, bestStreak: 0,
-      visitors: {}, pomoMonths: {}, done: [],
+      pomos: 0, pomoMinutes: null, keys: 0, early: false, top1: false, bestStreak: 0,
+      visitors: {}, pomoMonths: {}, pomoEvents: {}, done: [],
     };
   }
 }
 
 const stats = loadStats();
+
+/* v2.3 전에는 누적 시간을 따로 세지 않았다 — 남아 있는 잔디 합과
+ * 완주 횟수 × 25분 중 큰 쪽으로 한 번 채운다 (잔디는 예전엔 넉 달치만 남겼다) */
+(function backfillPomoMinutes() {
+  if (stats.pomoMinutes !== null) return;
+  let grass = 0;
+  for (const days of [pomoMine, pomoOthers]) for (const v of Object.values(days)) grass += Math.max(0, +v) || 0;
+  stats.pomoMinutes = Math.max(grass, stats.pomos * POMO_UNIT);
+  try { localStorage.setItem('petStats', JSON.stringify(stats)); } catch (_) { /* 무시 */ }
+})();
 
 let statsPushTimer = null;
 function saveStats() {
@@ -2844,9 +3010,9 @@ function saveStats() {
 function adoptStats(r) {
   if (!r || typeof r !== 'object') return;
   const before = JSON.stringify(stats);
-  for (const k of ['pomos', 'keys', 'bestStreak']) stats[k] = Math.max(stats[k], Math.floor(+r[k]) || 0);
+  for (const k of ['pomos', 'pomoMinutes', 'keys', 'bestStreak']) stats[k] = Math.max(stats[k], Math.floor(+r[k]) || 0);
   for (const k of ['early', 'top1']) stats[k] = stats[k] || !!r[k];
-  for (const key of ['visitors', 'pomoMonths']) {
+  for (const key of ['visitors', 'pomoMonths', 'pomoEvents']) {
     if (!r[key] || typeof r[key] !== 'object') continue;
     for (const [k, v] of Object.entries(r[key])) {
       stats[key][k] = Math.max(stats[key][k] || 0, Math.floor(+v) || 0);
@@ -2886,40 +3052,83 @@ const ACHIEVEMENTS = {
     emoji: '🦋', label: '방문객 친구', desc: '방문객 5종 모두 만나기',
     goal: 5, val: () => Object.keys(stats.visitors).length,
   },
-  // ---- 계절 이벤트 — 매년 그 달에 뽀모도로 20회 완주하면 스킨+소품 세트를 준다 ----
+  // ---- 계절 이벤트 — 매년 [전달 15일 ~ 그 달 15일]에 뽀모도로 20회 완주하면
+  //      그 달(season) 동안 쓸 수 있는 스킨/소품을 준다. window는 'MM-DD' (양 끝 포함) ----
   eventGhost: {
-    emoji: '🎃', label: '할로윈 준비', desc: '9월 한 달간 뽀모도로 20회 완주',
-    goal: 20, val: () => monthPomos('09'), reward: ['ghost', 'pumpkin'],
+    emoji: '🎃', label: '할로윈 준비', desc: '9월 15일~10월 15일에 뽀모도로 20회 완주',
+    goal: 20, window: ['09-15', '10-15'], val: () => eventPomos('eventGhost'), reward: ['ghost', 'pumpkin'],
   },
   eventIce: {
-    emoji: '🎄', label: '겨울 준비', desc: '11월 한 달간 뽀모도로 20회 완주',
-    goal: 20, val: () => monthPomos('11'), reward: ['ice', 'tree'],
+    emoji: '🎄', label: '겨울 준비', desc: '11월 15일~12월 15일에 뽀모도로 20회 완주',
+    goal: 20, window: ['11-15', '12-15'], val: () => eventPomos('eventIce'), reward: ['ice', 'tree'],
   },
   eventBlossom: {
-    emoji: '🌸', label: '봄나들이', desc: '4~5월 두 달간 뽀모도로 20회 완주',
-    goal: 20, val: () => monthPomos(['04', '05']), reward: ['blossom', 'vase'],
+    emoji: '🌸', label: '봄나들이', desc: '3월 15일~4월 15일에 뽀모도로 20회 완주',
+    goal: 20, window: ['03-15', '04-15'], val: () => eventPomos('eventBlossom'), reward: 'blossom',
+  },
+  eventVase: {
+    emoji: '💐', label: '봄 꽃꽂이', desc: '4월 15일~5월 15일에 뽀모도로 20회 완주',
+    goal: 20, window: ['04-15', '05-15'], val: () => eventPomos('eventVase'), reward: 'vase',
+  },
+  // ---- 히든 — 뽀모도로 누적 시간. 달성 전엔 이름을 숨기고 hint만 보인다 ----
+  soup100: {
+    emoji: '🥣', label: '100시간 우려낸 토마토 스프', desc: '뽀모도로 누적 100시간',
+    goal: 100, unit: '시간', val: pomoHours, reward: 'redGhost',
+    hidden: '모니터 속 클로드가 뭔가를 기다리고 있다…',
+  },
+  soup300: {
+    emoji: '🍲', label: '토마토 스프 숙성의 시간', desc: '뽀모도로 누적 300시간',
+    goal: 300, unit: '시간', val: pomoHours, reward: 'dino',
+    hidden: '모니터 속에서 무언가 보글보글 익어 간다…',
+  },
+  soup1000: {
+    emoji: '👑', label: '토마토 왕의 스프', desc: '뽀모도로 누적 1000시간',
+    goal: 1000, unit: '시간', val: pomoHours, reward: 'invader',
+    hidden: '왕의 식탁에만 오르는 스프가 있다던데…',
   },
 };
+
+function pomoHours() {
+  return Math.floor(stats.pomoMinutes / 60);
+}
 
 /* 보상은 하나(문자열)일 수도, 세트(배열)일 수도 있다 — 소품/스킨 어느 쪽이든 */
 function rewardItems(a) {
   if (!a.reward) return [];
   const keys = Array.isArray(a.reward) ? a.reward : [a.reward];
-  return keys.map((k) => DESK_ITEMS[k] || SKINS[k]).filter(Boolean);
+  return keys.map((k) => DESK_ITEMS[k] || SKINS[k] || SCREEN_ITEMS[k]).filter(Boolean);
 }
 
-/* 그 달(어느 해든)에 완주한 뽀모도로 최고 기록 — 이벤트는 매년 돌아온다.
- * 여러 달을 주면 같은 해 안에서 합친다 (4~5월 봄 이벤트) */
-function monthPomos(mm) {
-  const months = Array.isArray(mm) ? mm : [mm];
-  const byYear = {};
-  for (const [k, v] of Object.entries(stats.pomoMonths)) {
-    if (!months.includes(k.slice(5, 7))) continue;
-    const yr = k.slice(0, 4);
-    byYear[yr] = (byYear[yr] || 0) + (+v || 0);
-  }
-  return Math.max(0, ...Object.values(byYear));
+/* 오늘이 그 이벤트 기간인가 ('MM-DD'끼리 문자열 비교) */
+function inEventWindow(a, d = new Date()) {
+  const md = dayKey(d).slice(5);
+  return !!a.window && md >= a.window[0] && md <= a.window[1];
 }
+
+/* 이벤트 기간에 완주한 뽀모도로 — 해마다 따로 세고(키 'eventGhost-2026'), 최고 기록을 쓴다 */
+function eventPomos(id) {
+  let best = 0;
+  for (const [k, v] of Object.entries(stats.pomoEvents)) {
+    if (k.slice(0, -5) === id) best = Math.max(best, +v || 0);
+  }
+  return best;
+}
+
+/* v2.3 전에는 달 단위로만 셌다 — 지금 진행 중인 이벤트는 그 기간에 걸친 달의 기록으로
+ * 한 번 채워 준다 (기간 앞쪽 보름이 섞여 조금 후하다) */
+(function backfillEventPomos() {
+  const today = dayKey(new Date());
+  let changed = false;
+  for (const [id, a] of Object.entries(ACHIEVEMENTS)) {
+    const key = `${id}-${today.slice(0, 4)}`;
+    if (!inEventWindow(a) || key in stats.pomoEvents) continue;
+    const months = new Set([a.window[0].slice(0, 2), today.slice(5, 7)]);
+    let n = 0;
+    for (const mm of months) n += +stats.pomoMonths[`${today.slice(0, 4)}-${mm}`] || 0;
+    if (n) { stats.pomoEvents[key] = n; changed = true; }
+  }
+  if (changed) try { localStorage.setItem('petStats', JSON.stringify(stats)); } catch (_) { /* 무시 */ }
+})();
 
 // 테스트 모드에서 ?ach=1 이면 업적도 전부 열어 본다 (저장 안 됨)
 if (SANDBOX && params.get('ach') === '1') {
@@ -2936,7 +3145,8 @@ function inSeason(it) {
   if (!it || !it.season) return true;
   return it.season.includes(String(new Date().getMonth() + 1).padStart(2, '0'));
 }
-const seasonLabel = (it) => `${MONTH_NAMES[+it.season[0] - 1]}~${MONTH_NAMES[+it.season[it.season.length - 1] - 1]}`;
+const seasonLabel = (it) => (it.season.length === 1 ? MONTH_NAMES[+it.season[0] - 1]
+  : `${MONTH_NAMES[+it.season[0] - 1]}~${MONTH_NAMES[+it.season[it.season.length - 1] - 1]}`);
 
 /* 못 쓰는 아이템인가 — 레벨 부족 / 업적 미달성 / 철 지남 */
 function itemLocked(it) {
@@ -2949,7 +3159,7 @@ function itemLocked(it) {
  * 기본값으로 되돌린다. 데모 URL 파라미터로 지정한 경우는 그대로 둔다 */
 (function sanitizeEquipped() {
   if (SANDBOX || params.get('desk') || params.get('acc') || params.get('skin') ||
-      params.get('deskstyle') || params.get('kb')) return;
+      params.get('deskstyle') || params.get('kb') || params.get('screen')) return;
   const locked = itemLocked;
   // 액세서리는 여러 개라 잠긴 것만 골라 벗긴다
   let okAcc = petAcc.filter((k) => !locked(ACC_ITEMS[k]));
@@ -2963,6 +3173,7 @@ function itemLocked(it) {
     ['petSkin', SKINS[petSkin], 'none', (v) => { petSkin = v; }],
     ['deskStyle', DESK_STYLES[deskStyle], 'basic', (v) => { deskStyle = v; }],
     ['kbStyle', KB_ITEMS[kbStyle], 'basic', (v) => { kbStyle = v; }],
+    ['screenChar', SCREEN_ITEMS[screenChar], 'clawd', (v) => { screenChar = v; }],
   ];
   for (const [key, it, def, set] of fix) {
     if (!locked(it)) continue;
@@ -2979,7 +3190,13 @@ function checkAchievements() {
     state.celebrateUntil = performance.now() + CELEBRATE_MS;
     const rewards = rewardItems(a);
     const rewardMsg = rewards.map((r) => `${r.emoji} ${r.label}`).join(', ');
-    showToast(`🏅 업적 달성: ${a.label}!${rewardMsg ? ` — ${rewardMsg} 해제` : ''}`);
+    // 이벤트 보상은 그 달(시즌)에만 쓸 수 있다 — 9월 15일에 따면 10월부터
+    const later = rewards.find((r) => !inSeason(r));
+    showToast(`🏅 업적 달성: ${a.label}!${rewardMsg ? ` — ${rewardMsg} 해제` : ''}` +
+      (later ? ` (${seasonLabel(later)}부터 사용)` : ''));
+    // 스프를 마시고 모니터 속 캐릭터가 바뀐다 (여러 개가 한꺼번에 열리면 마지막 것까지 이어서)
+    const screen = [].concat(a.reward || []).find((k) => SCREEN_ITEMS[k]);
+    if (screen && !SANDBOX) evolveScreen(screen);
     if (window.pet) window.pet.notify('🏅 업적 달성!', `${a.label} — ${a.desc}`);
   }
   if (typeof achPanel !== 'undefined' && !achPanel.classList.contains('hidden')) renderAch();
@@ -3119,7 +3336,7 @@ let statsSyncOff = false;
 
 /* 지금 착용 중인 꾸미기 한 벌 — 서버에 올려 두면 친구들이 책상 구경을 할 수 있다 */
 function currentDeco() {
-  return { desk: deskItem, acc: accsKey(petAcc), skin: petSkin, deskStyle, kb: kbStyle };
+  return { desk: deskItem, acc: accsKey(petAcc), skin: petSkin, deskStyle, kb: kbStyle, screen: screenChar };
 }
 
 /* 점수 업로드. interactive는 "사용자가 방금 저장을 눌렀다"는 뜻 —
@@ -3134,7 +3351,7 @@ async function pushScore({ interactive = false } = {}) {
     p_xp: game.xp,
     p_pet: petKind,
   };
-  const withPomo = { ...args, p_device: deviceId, p_pomo: pomoMine };
+  const withPomo = { ...args, p_device: deviceId, p_pomo: recentDays(pomoMine) };
   const withDeco = { ...withPomo, p_deco: currentDeco() };
   const withStats = { ...withDeco, p_stats: stats };
   // 스키마가 낡은 순서대로 한 단계씩 물러선다: 업적 빼고 → 꾸미기 빼고 → 잔디도 빼고
@@ -3222,6 +3439,7 @@ function adoptState(s) {
       if (SKINS[d.skin]) { petSkin = d.skin; localStorage.setItem('petSkin', d.skin); }
       if (DESK_STYLES[d.deskStyle]) { deskStyle = d.deskStyle; localStorage.setItem('deskStyle', d.deskStyle); }
       if (KB_ITEMS[d.kb]) { kbStyle = d.kb; localStorage.setItem('kbStyle', d.kb); }
+      if (SCREEN_ITEMS[d.screen]) { screenChar = d.screen; localStorage.setItem('screenChar', d.screen); }
     } catch (_) { /* 무시 */ }
   }
   adoptOthers(s.pomo_others);
@@ -3561,7 +3779,7 @@ function drawCloud() {
 /* 그리기 헬퍼가 전부 전역 ctx/SCALE을 쓰므로, 잠깐 미니 캔버스로 바꿔
  * 정지 화면 한 장을 그리고 원래대로 되돌린다 (동기라 렌더 루프와 안 겹친다) */
 function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
-  const saved = { ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle };
+  const saved = { ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle, screenChar };
   const d = (r.deco && typeof r.deco === 'object') ? r.deco : {};
   ctx = previewCanvas.getContext('2d');
   SCALE = 4;
@@ -3575,6 +3793,7 @@ function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
   petSkin = SKINS[d.skin] ? d.skin : 'none';
   deskStyle = vis.full && DESK_STYLES[d.deskStyle] ? d.deskStyle : 'basic';
   kbStyle = vis.full && KB_ITEMS[d.kb] ? d.kb : 'basic';
+  screenChar = vis.full && SCREEN_ITEMS[d.screen] ? d.screen : 'clawd';
   previewLevel = Math.max(1, +r.level || 1); // 화분은 그 사람 레벨만큼 자라 있다
 
   ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -3618,7 +3837,7 @@ function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
   }
   ctx.restore();
 
-  ({ ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle } = saved);
+  ({ ctx, SCALE, HALF, petKind, petAcc, deskItem, petSkin, deskStyle, kbStyle, screenChar } = saved);
   previewLevel = null;
 }
 
@@ -4151,7 +4370,7 @@ const FRAME_ROAM_MS = 50; // 돌아다닐 땐 캔버스가 화면 폭이라 20fp
  * 다음 프레임까지 필요한 만큼만 자고 일어나는 타이머로 돈다 */
 function isActive(now) {
   return now - state.lastKey < 600 || now - state.lastMouse < 600 ||
-    now < state.celebrateUntil || now < state.sadUntil || !!visitor.kind || roam.active;
+    now < state.celebrateUntil || now < state.sadUntil || now < screenFx.until || !!visitor.kind || roam.active;
 }
 
 function loop() {
@@ -4430,10 +4649,16 @@ function finishTimer() {
     savePomoMine();
     if (!grassPanel.classList.contains('hidden')) renderGrass();
     pushScore(); // 다른 PC에서도 보이게 바로 올린다
-    // 업적 통계 — 완주 횟수, 이벤트용 월별 횟수, 최고 연속 기록
+    // 업적 통계 — 완주 횟수, 월별/이벤트 기간 횟수, 최고 연속 기록
     stats.pomos += 1;
+    stats.pomoMinutes += timer.minutes;
     const mk = k.slice(0, 7); // 'YYYY-MM'
     stats.pomoMonths[mk] = (stats.pomoMonths[mk] || 0) + 1;
+    for (const [id, a] of Object.entries(ACHIEVEMENTS)) {
+      if (!inEventWindow(a)) continue;
+      const ek = `${id}-${k.slice(0, 4)}`;
+      stats.pomoEvents[ek] = (stats.pomoEvents[ek] || 0) + 1;
+    }
     stats.bestStreak = Math.max(stats.bestStreak, currentStreak());
     saveStats();
     checkAchievements();
@@ -4461,9 +4686,8 @@ const bragEl = document.getElementById('brag');
 const bragText = document.getElementById('brag-text');
 const bragGrass = document.getElementById('brag-grass');
 
-function grassCell(d, todayKey) {
+function grassCell(d, todayKey, min = dayMinutes(d)) {
   const k = dayKey(d);
-  const min = dayMinutes(d);
   const el = document.createElement('i');
   el.className = `g g${grassLevel(min)}`;
   if (k === todayKey) el.classList.add('today');
@@ -4490,21 +4714,52 @@ function renderMonths(firstSunday) {
   grassMonths.replaceChildren(frag);
 }
 
+/* 몇 페이지(16주 단위) 전을 보고 있나 — 0이 지금 */
+let grassPage = 0;
+const grassPrev = document.getElementById('grass-prev');
+const grassNext = document.getElementById('grass-next');
+
+function firstGrassDay() {
+  const keys = [...Object.keys(pomoMine), ...Object.keys(pomoOthers)];
+  return keys.length ? keys.reduce((a, b) => (a < b ? a : b)) : dayKey(new Date());
+}
+
+const fmtHours = (min) => (min >= 60 ? `${Math.floor(min / 60)}시간 ${min % 60}분` : `${min}분`);
+
 function renderGrass() {
   const today = new Date();
   const todayKey = dayKey(today);
-  // 왼쪽 위 칸 = 16주 전 그 주의 일요일
-  const first = addDays(today, -(today.getDay() + (GRASS_WEEKS - 1) * 7));
+  // 왼쪽 위 칸 = 16주 전 그 주의 일요일 (페이지마다 16주씩 더 과거로)
+  const first = addDays(today, -(today.getDay() + (GRASS_WEEKS - 1) * 7 + grassPage * GRASS_WEEKS * 7));
   const frag = document.createDocumentFragment();
-  for (let i = 0; i < GRASS_WEEKS * 7; i++) frag.appendChild(grassCell(addDays(first, i), todayKey));
+  let total = 0;
+  for (let i = 0; i < GRASS_WEEKS * 7; i++) {
+    const d = addDays(first, i);
+    const min = dayMinutes(d);
+    frag.appendChild(grassCell(d, todayKey, min));
+    total += min;
+  }
   grassGrid.replaceChildren(frag);
   renderMonths(first);
+  grassNext.disabled = grassPage === 0;
+  grassPrev.disabled = dayKey(first) <= firstGrassDay();
 
-  const streak = currentStreak();
-  grassStreak.textContent = streak >= 2 ? `${streak}일 연속 🔥` : '';
-  grassSum.textContent = `이번 주 ${thisWeekDays()}일`;
-  grassToday.textContent = `오늘 ${dayMinutes(today)}분`;
+  if (grassPage === 0) {
+    const streak = currentStreak();
+    grassStreak.textContent = streak >= 2 ? `${streak}일 연속 🔥` : '';
+    grassSum.textContent = `이번 주 ${thisWeekDays()}일`;
+    grassToday.textContent = `오늘 ${dayMinutes(today)}분`;
+  } else {
+    const last = addDays(first, GRASS_WEEKS * 7 - 1);
+    const md = (d) => `${d.getMonth() + 1}.${d.getDate()}`;
+    grassSum.textContent = `${first.getFullYear()}.${md(first)} ~ ${last.getFullYear() !== first.getFullYear() ? `${last.getFullYear()}.` : ''}${md(last)}`;
+    grassStreak.textContent = '';
+    grassToday.textContent = `이 기간 ${fmtHours(total)}`;
+  }
 }
+
+grassPrev.addEventListener('click', () => { grassPage++; renderGrass(); });
+grassNext.addEventListener('click', () => { grassPage = Math.max(0, grassPage - 1); renderGrass(); });
 
 /* ---- 안 물어봤는데 자랑하는 말풍선 ---- */
 const BRAG_MS = 6000;
@@ -4568,6 +4823,7 @@ document.getElementById('btn-rank').addEventListener('click', () => {
 });
 
 document.getElementById('btn-grass').addEventListener('click', () => {
+  grassPage = 0;
   if (openPanel(grassPanel)) renderGrass();
 });
 
@@ -4834,6 +5090,12 @@ function renderDeco() {
     (it) => `${it.emoji} ${it.label}으로 교체!`);
   decoRow('deco-kb', KB_ITEMS, () => kbStyle, (k) => { kbStyle = k; }, 'kbStyle',
     (it) => `${it.emoji} ${it.label}로 교체!`);
+  const screens = Object.fromEntries(Object.entries(SCREEN_ITEMS).filter(([, it]) => !itemLocked(it)));
+  const showScreen = Object.keys(screens).length > 1;
+  document.getElementById('deco-screen-title').classList.toggle('hidden', !showScreen);
+  document.getElementById('deco-screen').classList.toggle('hidden', !showScreen);
+  decoRow('deco-screen', screens, () => screenChar, (k) => { screenChar = k; }, 'screenChar',
+    (it) => `${it.emoji} 모니터에 ${it.label}!`);
 }
 
 document.getElementById('btn-pet').addEventListener('click', () => {
@@ -4864,11 +5126,12 @@ function renderAch() {
 
     const body = document.createElement('div');
     body.className = 'ach-body';
+    const secret = a.hidden && !done;
     const name = document.createElement('b');
-    name.textContent = a.label;
+    name.textContent = secret ? '???' : a.label;
     const desc = document.createElement('small');
     const rewards = rewardItems(a);
-    desc.textContent = a.desc +
+    desc.textContent = secret ? a.hidden : a.desc +
       (rewards.length ? ` → ${rewards.map((r) => `${r.emoji} ${r.label}`).join(', ')}` : '');
     const bar = document.createElement('div');
     bar.className = 'ach-bar';
@@ -4879,7 +5142,7 @@ function renderAch() {
 
     const val = document.createElement('span');
     val.className = 'ach-val';
-    val.textContent = done ? '✓' : fmtGoal(v, a.goal);
+    val.textContent = done ? '✓' : fmtGoal(v, a.goal) + (a.unit || '');
 
     li.append(emoji, body, val);
     return li;
@@ -4971,16 +5234,14 @@ setInterval(() => {
 // 이벤트 달이면 그 달에 한 번만 알려 준다 (이미 받은 스킨이면 조용히)
 (function eventNotice() {
   if (DEMO || SANDBOX) return;
-  const mm = dayKey(new Date()).slice(5, 7);
-  const ev = mm === '09' && !achUnlocked('eventGhost')
-    ? '🎃 이벤트! 9월에 뽀모도로 20회 완주하면 👻 유령 스킨을 받아요'
-    : mm === '11' && !achUnlocked('eventIce')
-      ? '🎄 이벤트! 11월에 뽀모도로 20회 완주하면 ❄️ 아이스 스킨을 받아요'
-      : (mm === '04' || mm === '05') && !achUnlocked('eventBlossom')
-        ? '🌸 이벤트! 4~5월에 뽀모도로 20회 완주하면 🌸 벚꽃 스킨을 받아요'
-        : '';
-  const key = `eventNotice-${dayKey(new Date()).slice(0, 7)}`;
-  if (!ev || localStorage.getItem(key) === '1') return;
+  const found = Object.entries(ACHIEVEMENTS).find(([id, a]) => inEventWindow(a) && !achUnlocked(id));
+  if (!found) return;
+  const [id, a] = found;
+  const rewards = rewardItems(a);
+  const ev = `${a.emoji} 이벤트! ${a.desc}하면 ${rewards.map((r) => `${r.emoji} ${r.label}`).join(' + ')}을(를) 받아요` +
+    ` (${seasonLabel(rewards[0])}에 사용)`;
+  const key = `eventNotice-${id}-${dayKey(new Date()).slice(0, 4)}`; // 기간마다 한 번
+  if (localStorage.getItem(key) === '1') return;
   try { localStorage.setItem(key, '1'); } catch (_) { /* 무시 */ }
   setTimeout(() => showToast(ev), 6000);
 })();
@@ -4990,6 +5251,14 @@ const bragDay = dayKey(new Date());
 if (!DEMO && localStorage.getItem('lastBragDay') !== bragDay) {
   try { localStorage.setItem('lastBragDay', bragDay); } catch (_) { /* 무시 */ }
   setTimeout(showBrag, 2500);
+}
+
+// ?evolve=dino 로 실행하면 진화 연출만 본다 — 저장은 안 한다 (테스트/스크린샷용)
+const DEMO_EVOLVE = params.get('evolve');
+if (SCREEN_ITEMS[DEMO_EVOLVE]) {
+  const now = performance.now();
+  Object.assign(screenFx, { from: screenChar, to: DEMO_EVOLVE, start: now, until: now + EVOLVE_MS });
+  screenChar = DEMO_EVOLVE;
 }
 
 // ?timer=25 로 실행하면 바로 타이머 시작 (테스트/스크린샷용)
