@@ -2762,11 +2762,14 @@ function loadDays(key) {
 let pomoMine = loadDays('pomoMine');
 let pomoOthers = loadDays('pomoOthers');
 
+function randomId() {
+  return [...crypto.getRandomValues(new Uint32Array(4))].map((n) => n.toString(36)).join('');
+}
+
 // 기기 구분용 — 서버는 기기별로 나눠 담았다가 날짜별로 더한다
 let deviceId = localStorage.getItem('deviceId') || '';
 if (!deviceId) {
-  deviceId = [...crypto.getRandomValues(new Uint32Array(4))]
-    .map((n) => n.toString(36)).join('');
+  deviceId = randomId();
   try { localStorage.setItem('deviceId', deviceId); } catch (_) { /* 무시 */ }
 }
 
@@ -2871,6 +2874,55 @@ if (SANDBOX) {
   game.xp = 0;
 }
 
+/* ---- 경험치 장부 — 여러 PC에서 번 경험치를 더한다 ----
+ * 예전엔 레벨/경험치를 마지막에 올린 PC가 통째로 덮어써서, 두 PC를 같이 켜 두면
+ * 한쪽에서 번 만큼이 사라졌다. 이제는 잔디처럼 PC마다 제 몫을 올리고 서버가 더한다.
+ *   xpMine   — 이 PC가 번 순증가 (잠들기·잔소리로 깎인 것도 포함 — 음수일 수 있다)
+ *   xpOthers — 서버가 알려 준 나머지 (기준점 + 다른 PC 몫). null이면 아직 장부에 합류 전 —
+ *              그동안은 예전처럼 이 PC 값만 본다
+ *   xpKey    — 서버 장부에서 이 PC 몫의 열쇠. 계정을 새로 연결하면 새 열쇠로 다시 합류한다
+ * 보이는 레벨/경험치 = (xpOthers + xpMine)을 레벨로 편 것 */
+let xpMine = Math.floor(+localStorage.getItem('xpMine')) || 0;
+let xpOthers = localStorage.getItem('xpOthers') === null
+  ? null : Math.floor(+localStorage.getItem('xpOthers')) || 0;
+let xpKey = localStorage.getItem('xpKey') || '';
+
+// 레벨 + 경험치 → 누적 경험치 한 수 (서버의 total_xp()와 짝)
+function xpTotal(level, xp) {
+  let t = xp;
+  for (let lv = 1; lv < level; lv++) t += XP_PER_LEVEL(lv);
+  return t;
+}
+
+function fromXpTotal(total) {
+  let level = 1;
+  let xp = Math.max(0, Math.floor(total) || 0);
+  while (xp >= XP_PER_LEVEL(level)) {
+    xp -= XP_PER_LEVEL(level);
+    level += 1;
+  }
+  return { level, xp };
+}
+
+function saveXpLedger() {
+  if (SANDBOX) return;
+  try {
+    localStorage.setItem('xpMine', xpMine);
+    if (xpOthers === null) localStorage.removeItem('xpOthers');
+    else localStorage.setItem('xpOthers', xpOthers);
+    localStorage.setItem('xpKey', xpKey);
+  } catch (_) { /* 무시 */ }
+}
+
+// 밖에서 받은 상태로 레벨을 통째로 바꿨을 때 — 그 값을 출발점 삼아 새 열쇠로 다시 합류한다.
+// 옛 열쇠의 몫은 서버에 그대로 남으므로 같은 경험치를 두 번 세지 않는다
+function resetXpLedger() {
+  xpMine = 0;
+  xpOthers = null;
+  xpKey = '';
+  saveXpLedger();
+}
+
 const hudLevel = document.getElementById('hud-level');
 const hudXp = document.getElementById('hud-xp');
 const xpFill = document.getElementById('xpfill');
@@ -2882,6 +2934,7 @@ function saveGame() {
   try {
     localStorage.setItem('petLevel', game.level);
     localStorage.setItem('petXp', game.xp);
+    localStorage.setItem('xpMine', xpMine);
   } catch (_) { /* 무시 */ }
 }
 
@@ -2906,7 +2959,21 @@ function updateHud() {
   if (fill !== hudLast.fill) { xpFill.style.width = fill; hudLast.fill = fill; }
 }
 
+function celebrateLevelUp(prevLevel) {
+  state.celebrateUntil = performance.now() + CELEBRATE_MS;
+  if (window.pet) window.pet.notify('🎉 레벨 업!', `펫이 Lv.${game.level}이 되었어요!`);
+  // 이번 레벨 업으로 새로 열린 꾸미기 아이템 알림 (업적 아이템은 레벨과 무관)
+  const news = [
+    ...Object.values(DESK_ITEMS), ...Object.values(ACC_ITEMS),
+    ...Object.values(SKINS), ...Object.values(DESK_STYLES), ...Object.values(KB_ITEMS),
+  ].filter((it) => !it.ach && it.lv > prevLevel && it.lv <= game.level);
+  const names = news.map((it) => `${it.emoji} ${it.label}`);
+  if (prevLevel < ACC_STACK_LV && game.level >= ACC_STACK_LV) names.push('👓+🧣 액세서리 겹쳐 착용');
+  if (names.length) showToast(`🔓 해제: ${names.join(', ')}`);
+}
+
 function addXp(n) {
+  const before = xpTotal(game.level, game.xp);
   game.xp += n;
   let leveled = false;
   const prevLevel = game.level;
@@ -2927,17 +2994,10 @@ function addXp(n) {
       game.xp = 0;
     }
   }
+  // 장부에는 바닥에 막힌 만큼을 뺀, 실제로 바뀐 만큼만 적는다
+  xpMine += xpTotal(game.level, game.xp) - before;
   if (leveled) {
-    state.celebrateUntil = performance.now() + CELEBRATE_MS;
-    if (window.pet) window.pet.notify('🎉 레벨 업!', `펫이 Lv.${game.level}이 되었어요!`);
-    // 이번 레벨 업으로 새로 열린 꾸미기 아이템 알림 (업적 아이템은 레벨과 무관)
-    const news = [
-      ...Object.values(DESK_ITEMS), ...Object.values(ACC_ITEMS),
-      ...Object.values(SKINS), ...Object.values(DESK_STYLES), ...Object.values(KB_ITEMS),
-    ].filter((it) => !it.ach && it.lv > prevLevel && it.lv <= game.level);
-    const names = news.map((it) => `${it.emoji} ${it.label}`);
-    if (prevLevel < ACC_STACK_LV && game.level >= ACC_STACK_LV) names.push('👓+🧣 액세서리 겹쳐 착용');
-    if (names.length) showToast(`🔓 해제: ${names.join(', ')}`);
+    celebrateLevelUp(prevLevel);
     pushScore();
   }
   if (dropped) {
@@ -3358,6 +3418,7 @@ function sbRpc(fn, args) {
 let pomoSyncOff = false;
 let decoSyncOff = false;
 let statsSyncOff = false;
+let xpSyncOff = false;
 
 /* 지금 착용 중인 꾸미기 한 벌 — 서버에 올려 두면 친구들이 책상 구경을 할 수 있다 */
 function currentDeco() {
@@ -3379,8 +3440,14 @@ async function pushScore({ interactive = false } = {}) {
   const withPomo = { ...args, p_device: deviceId, p_pomo: recentDays(pomoMine) };
   const withDeco = { ...withPomo, p_deco: currentDeco() };
   const withStats = { ...withDeco, p_stats: stats };
-  // 스키마가 낡은 순서대로 한 단계씩 물러선다: 업적 빼고 → 꾸미기 빼고 → 잔디도 빼고
+  if (!xpKey) {
+    xpKey = randomId();
+    saveXpLedger();
+  }
+  const withXp = { ...withStats, p_xp_key: xpKey, p_xp_mine: xpMine };
+  // 스키마가 낡은 순서대로 한 단계씩 물러선다: 경험치 장부 빼고 → 업적 빼고 → 꾸미기 빼고 → 잔디도 빼고
   const tiers = [
+    [() => xpSyncOff, () => { xpSyncOff = true; }, withXp],
     [() => statsSyncOff, () => { statsSyncOff = true; }, withStats],
     [() => decoSyncOff, () => { decoSyncOff = true; }, withDeco],
     [() => pomoSyncOff, () => { pomoSyncOff = true; }, withPomo],
@@ -3415,6 +3482,7 @@ async function pushScore({ interactive = false } = {}) {
     }
     if (res) adoptOthers(res.pomo_others);
     if (res && res.pomo_others) ensurePomoLegacy(); // 시작할 때 오프라인이었으면 여기서
+    if (res) adoptXpOthers(res.xp_others);
     return true;
   } catch (err) {
     console.error('점수 업로드 실패:', err.message);
@@ -3448,10 +3516,27 @@ function adoptOthers(remote) {
   if (!grassPanel.classList.contains('hidden')) renderGrass();
 }
 
-// 서버에 저장된 상태를 이 PC에 반영
-function adoptState(s) {
-  game.level = Math.max(1, +s.level || 1);
-  game.xp = Math.max(0, +s.xp || 0);
+/* 서버가 알려 준 "나머지 몫"(기준점 + 다른 PC들)에 내 몫을 더해 레벨을 다시 맞춘다.
+ * 다른 PC에서 레벨이 올랐으면 여기서도 축하한다 */
+function adoptXpOthers(v) {
+  if (SANDBOX || v == null || !Number.isFinite(+v)) return;
+  xpOthers = Math.floor(+v);
+  saveXpLedger();
+  const prevLevel = game.level;
+  Object.assign(game, fromXpTotal(xpOthers + xpMine));
+  if (game.level > prevLevel) celebrateLevelUp(prevLevel);
+  saveGame();
+  updateHud();
+}
+
+// get_state 응답에서 내 몫을 뺀 나머지 — 서버가 내 열쇠를 아직 모르면 합계 전체가 나머지다
+function xpOthersFrom(res) {
+  const saved = res.xp_by_device && res.xp_by_device[xpKey];
+  return +res.xp_total - (+saved || 0);
+}
+
+// 펫/꾸미기는 합칠 수 없으니 가장 최근에 올린 PC를 따른다
+function adoptLook(s) {
   if (PET_DEFS[s.pet]) {
     petKind = s.pet;
     try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
@@ -3468,9 +3553,17 @@ function adoptState(s) {
       if (SCREEN_ITEMS[d.screen]) { screenChar = d.screen; localStorage.setItem('screenChar', d.screen); }
     } catch (_) { /* 무시 */ }
   }
+  try { localStorage.setItem('lastPushAt', s.updated_at || ''); } catch (_) { /* 무시 */ }
+}
+
+// 서버에 저장된 상태를 이 PC에 통째로 반영 (계정 연결 / 장부를 모르는 서버)
+function adoptState(s) {
+  game.level = Math.max(1, +s.level || 1);
+  game.xp = Math.max(0, +s.xp || 0);
+  resetXpLedger();
+  adoptLook(s);
   adoptOthers(s.pomo_others);
   saveGame();
-  try { localStorage.setItem('lastPushAt', s.updated_at || ''); } catch (_) { /* 무시 */ }
   updateHud();
 }
 
@@ -3515,11 +3608,39 @@ async function syncOnStart() {
     if (res.pomo_others) ensurePomoLegacy(); // 다른 PC 잔디까지 받은 뒤라야 정확하다
     const lastPush = localStorage.getItem('lastPushAt') || '';
     // 같은 서버가 찍은 ISO 타임스탬프라 문자열 비교로 충분
-    if (lastPush && res.updated_at <= lastPush) return; // 이 PC가 최신
-    adoptState(res);
-    showToast('다른 PC의 진행 상황을 불러왔어요 ✨');
+    const newer = !lastPush || res.updated_at > lastPush;
+    if (res.xp_total != null) {
+      // 경험치는 장부로 더한다 — 어느 PC가 최신이든 상관없다
+      if (newer) adoptLook(res);
+      const before = xpTotal(game.level, game.xp);
+      if (xpOthers !== null) adoptXpOthers(xpOthersFrom(res));
+      else await pushScore(); // 장부에 처음 합류 — 서버가 이 PC와 서버 값 중 큰 쪽에서 이어 간다
+      if (xpTotal(game.level, game.xp) > before) showToast('다른 PC에서 키운 만큼을 합쳤어요 ✨');
+    } else if (newer) {
+      adoptState(res); // 장부를 모르는 서버 — 예전처럼 최신 PC를 통째로 따른다
+      showToast('다른 PC의 진행 상황을 불러왔어요 ✨');
+    }
   } catch (_) { /* 오프라인 등 — 로컬 유지 */ }
   checkTop1();
+}
+
+/* 다른 PC에서 번 경험치·잔디·업적을 받아 온다 (랭킹 새로고침 / 일 시작).
+ * 읽기만 한다 — 올리면 이 PC의 꾸미기가 다른 PC에서 고른 걸 덮어쓴다.
+ * 다른 PC 몫이 늘었으면 true */
+async function refreshState() {
+  if (SANDBOX || !nickname || !syncCode) return false;
+  try {
+    const res = await fetchState(nickname, syncCode);
+    if (!res || res.error) return false;
+    adoptOthers(res.pomo_others);
+    adoptStats(res.stats);
+    if (res.xp_total == null || xpOthers === null) return false;
+    const before = xpTotal(game.level, game.xp);
+    adoptXpOthers(xpOthersFrom(res));
+    return xpTotal(game.level, game.xp) > before;
+  } catch (_) {
+    return false; // 오프라인 — 다음에
+  }
 }
 
 const rankList = document.getElementById('rank-list');
@@ -3757,10 +3878,8 @@ function toggleRankPreview(r) {
       showToast(`💭 상상하려면 경험치 ${IMAGINE_COST.toLocaleString()}이 필요해요 (지금 ${game.xp.toLocaleString()})`);
       return;
     }
-    game.xp -= IMAGINE_COST;
+    addXp(-IMAGINE_COST); // 모아 둔 경험치 안에서만 쓰니 강등은 없다
     imaginePaid = { nick: r.nickname, at: Date.now() };
-    saveGame();
-    updateHud();
     showToast(`💭 경험치 ${IMAGINE_COST.toLocaleString()}을 상상에 사용했어요`);
   }
   previewNick = r.nickname;
@@ -3868,7 +3987,7 @@ function renderDeskPreview(r, vis = { acc: true, desk: true, full: true }) {
   previewLevel = null;
 }
 
-// 일하는 중엔 5분마다 점수 자동 업로드
+// 일하는 중엔 5분마다 점수 자동 업로드 — 응답에 다른 PC 몫이 실려 와 레벨도 같이 맞춰진다
 setInterval(() => {
   if (game.working) pushScore();
 }, 300000);
@@ -4880,7 +4999,10 @@ document.getElementById('btn-nick').addEventListener('click', async () => {
   loadRanking();
 });
 
-document.getElementById('btn-rank-refresh').addEventListener('click', loadRanking);
+document.getElementById('btn-rank-refresh').addEventListener('click', async () => {
+  loadRanking();
+  if (await refreshState()) showToast('다른 PC에서 키운 만큼을 합쳤어요 ✨');
+});
 
 /* ---- 동기화 코드 표시 / 다른 PC에서 이어하기 ---- */
 const codeRow = document.getElementById('code-row');
@@ -4934,6 +5056,7 @@ document.getElementById('btn-link').addEventListener('click', async () => {
     } catch (_) { /* 무시 */ }
     nicknameInput.value = nickname;
     adoptState(res);
+    pushScore(); // 이 PC도 장부에 합류 — 여기서 번 경험치가 다른 PC에 더해진다
     linkBox.classList.add('hidden');
     updateCodeRow();
     showToast(`${nickname}의 펫을 불러왔어요! 🎉`);
@@ -4959,6 +5082,7 @@ btnWork.addEventListener('click', () => {
     btnAway.classList.remove('hidden');
     btnAway.classList.remove('on');
     showToast('일 시작! 열심히 하면 펫이 자라요 💪');
+    refreshState(); // 켜만 뒀던 PC — 그사이 다른 PC에서 키운 만큼부터 맞추고 시작한다
   } else {
     const sessionMs = Date.now() - game.sessionStart;
     const mins = Math.max(1, Math.round(sessionMs / 60000));

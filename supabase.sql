@@ -1,4 +1,8 @@
--- 리더보드 스키마 v9 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기 + 업적 + 주간 랭킹
+-- 리더보드 스키마 v10 — 닉네임 계정 + 동기화 코드 + 잔디밭 + 꾸미기 + 업적 + 주간 랭킹 + 경험치 장부
+-- (v10에서 바뀐 것: 경험치 장부 — 레벨/경험치를 마지막에 올린 PC가 통째로 덮어쓰던 걸
+--  PC별 순증가의 합으로. 두 PC를 같이 켜 두면 한쪽에서 번 만큼이 사라지고,
+--  다음에 켠 PC가 남의 값으로 되돌아가곤 했다. 장부를 모르는 옛 앱이 올리면
+--  더 클 때만 따라가고 작으면 무시한다)
 -- (v9에서 바뀐 것: 잔디를 지우지 않고 영구 보관 — 기기 칸을 통째로 갈아 끼우던 걸
 --  덮어 합치기로. 앱은 최근 몇 달치만 올리고, 그 전 날짜는 서버에 남는다.
 --  기기가 10대를 넘으면 밀려나는 기기 기록은 'archive' 칸에 더해 둔다.
@@ -66,6 +70,17 @@ alter table public.leaderboard add column if not exists week_key text;
 alter table public.leaderboard add column if not exists week_xp int not null default 0;
 create index if not exists leaderboard_week_idx
   on public.leaderboard (week_key, week_xp desc);
+
+-- v9 → v10: 경험치 장부. 잔디처럼 PC마다 제 몫을 따로 담고 더한다.
+--   xp_by_device: { 'PC 열쇠': 그 PC가 번 순증가 (깎인 것 포함 — 음수일 수 있다) }
+--   xp_base:      나머지 전부 (장부 시작 전 누적 + PC가 합류하며 맞춘 차이).
+--                 null이면 v10 뒤로 아직 아무도 안 올린 행 — 그땐 level/xp가 곧 누적
+--   누적 = xp_base + 열쇠별 합. level/xp 칼럼은 올릴 때마다 이 누적에서 다시 계산한다 (랭킹용)
+-- PC는 자기 열쇠에 "지금까지 번 총량"을 덮어쓴다 — 같은 요청이 두 번 가도 두 번 세지 않는다.
+-- 열쇠는 기기 id와 따로 둔다: 계정을 다시 연결한 PC는 새 열쇠로 합류하고, 옛 열쇠 몫은 그대로 남는다
+alter table public.leaderboard add column if not exists xp_base bigint;
+alter table public.leaderboard
+  add column if not exists xp_by_device jsonb not null default '{}'::jsonb;
 
 -- 개수로 세던 중간 버전에서 올라오는 경우: 한 개를 25분으로 환산해 옮긴다
 do $$
@@ -275,6 +290,37 @@ as $$
   select 1000::bigint * p_level * (p_level - 1) / 2 + p_xp;
 $$;
 
+-- 누적 경험치 → 레벨 (total_xp의 거꾸로): 500·L·(L−1) ≤ 누적 인 가장 큰 L
+create or replace function public.level_from_total(p_total bigint)
+returns int
+language plpgsql
+immutable
+as $$
+declare
+  v_lv int := greatest(1, floor((1 + sqrt(1 + greatest(p_total, 0) / 125.0)) / 2)::int);
+begin
+  -- 제곱근의 부동소수 오차 보정
+  while public.total_xp(v_lv + 1, 0) <= p_total loop
+    v_lv := v_lv + 1;
+  end loop;
+  while v_lv > 1 and public.total_xp(v_lv, 0) > p_total loop
+    v_lv := v_lv - 1;
+  end loop;
+  return v_lv;
+end;
+$$;
+
+-- 경험치 장부에서 한 열쇠를 뺀 나머지 PC 몫의 합 (p_except가 null이면 전부)
+create or replace function public.sum_xp(p_all jsonb, p_except text)
+returns bigint
+language sql
+immutable
+as $$
+  select coalesce(sum((value #>> '{}')::bigint), 0)
+  from jsonb_each(coalesce(p_all, '{}'::jsonb))
+  where p_except is null or key <> p_except;
+$$;
+
 -- 이번 주 열쇠 = 이번 주 일요일 날짜(한국 시간). 일요일 0시에 모두 함께 리셋된다.
 -- (잔디밭의 "이번 주"도 일요일 시작이라 맞췄다. date_trunc('week')는 월요일 기준이므로 안 쓴다)
 -- pet.js의 weekKeyKST()와 같은 규칙 — 앱은 이 값으로 이번 주 행만 골라 읽는다.
@@ -299,11 +345,12 @@ drop function if exists public.upsert_score(text, text, int, int, text);
 drop function if exists public.upsert_score(text, text, int, int, text, jsonb);
 drop function if exists public.upsert_score(text, text, int, int, text, text, jsonb);
 drop function if exists public.upsert_score(text, text, int, int, text, text, jsonb, jsonb);
+drop function if exists public.upsert_score(text, text, int, int, text, text, jsonb, jsonb, jsonb);
 
 create or replace function public.upsert_score(
   p_nickname text, p_secret text, p_level int, p_xp int, p_pet text,
   p_device text default null, p_pomo jsonb default null, p_deco jsonb default null,
-  p_stats jsonb default null
+  p_stats jsonb default null, p_xp_key text default null, p_xp_mine bigint default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -315,7 +362,14 @@ declare
   v_row public.leaderboard;
   v_devices jsonb;
   v_stats jsonb;
-  v_total bigint;
+  v_client bigint;   -- 이 PC가 보고 있는 누적
+  v_total bigint;    -- 합친 누적
+  v_ledger boolean;  -- 장부로 올렸나 (아니면 장부를 모르는 옛 앱)
+  v_xp_dev jsonb;
+  v_base bigint;
+  v_rest bigint;     -- 이 열쇠를 뺀 나머지 PC 몫의 합
+  v_mine bigint;
+  v_level int;
   v_week text := public.current_week_key();
   v_week_xp bigint;
 begin
@@ -331,7 +385,7 @@ begin
      or p_pet not in ('cat', 'dog', 'rabbit', 'hamster', 'otter') then
     return jsonb_build_object('error', 'bad_input');
   end if;
-  v_total := public.total_xp(p_level, p_xp);
+  v_client := public.total_xp(p_level, p_xp);
 
   select * into v_row from public.leaderboard
     where lower(nickname) = lower(v_nick);
@@ -372,12 +426,38 @@ begin
   v_stats := case when p_stats is null then coalesce(v_row.stats, '{}'::jsonb)
                   else public.merge_stats(coalesce(v_row.stats, '{}'::jsonb), p_stats) end;
 
+  -- 경험치 장부. v_base는 행이 없을 때만 null (v10 뒤 처음 올리는 행은 지금 누적이 곧 기준점)
+  v_ledger := p_xp_mine is not null and p_xp_key is not null and length(p_xp_key) between 1 and 64;
+  v_xp_dev := coalesce(v_row.xp_by_device, '{}'::jsonb);
+  v_base := coalesce(v_row.xp_base, public.total_xp(v_row.level, v_row.xp));
+  if v_ledger then
+    v_mine := least(greatest(p_xp_mine, -1000000000000), 1000000000000);
+    v_rest := public.sum_xp(v_xp_dev, p_xp_key);
+    if v_xp_dev -> p_xp_key is null then
+      -- 처음 보는 열쇠 = 합류. 서버 누적과 이 PC가 보던 누적 중 큰 쪽에서 이어 간다.
+      -- (예전 방식으로 갈라진 두 PC는 어느 몫이 겹치는지 알 수 없어 더 키운 쪽을 따른다.
+      --  greatest는 null을 건너뛰므로 새 행이면 이 PC 값 그대로)
+      v_total := greatest(v_base + v_rest, v_client);
+    else
+      v_total := greatest(v_base + v_rest + v_mine, 0);
+    end if;
+    v_base := v_total - v_rest - v_mine;
+    v_xp_dev := jsonb_set(v_xp_dev, array[p_xp_key], to_jsonb(v_mine));
+  else
+    -- 장부를 모르는 옛 앱: 그 PC 값이 더 크면 기준점을 올려 따라가고, 작으면 무시한다.
+    -- 덮어쓰면 함께 켜 둔 다른 PC가 번 만큼이 사라진다 (새 행이면 v_base가 null이라 이 PC 값)
+    v_rest := public.sum_xp(v_xp_dev, null);
+    v_total := greatest(v_base + v_rest, v_client);
+    v_base := v_total - v_rest;
+  end if;
+  v_level := public.level_from_total(v_total);
+
   if not found then
     begin
       insert into public.leaderboard (nickname, secret_hash, level, xp, pet, pomo_by_device, deco, stats,
-                                      total_xp, week_key, week_xp)
-      values (v_nick, public.hash_secret(p_secret), p_level, p_xp, p_pet, v_devices,
-              public.clean_deco(p_deco), v_stats, v_total, v_week, 0)
+                                      total_xp, week_key, week_xp, xp_base, xp_by_device)
+      values (v_nick, public.hash_secret(p_secret), v_level, v_total - public.total_xp(v_level, 0), p_pet,
+              v_devices, public.clean_deco(p_deco), v_stats, v_total, v_week, 0, v_base, v_xp_dev)
       returning * into v_row;
     exception when unique_violation then
       return jsonb_build_object('error', 'nickname_taken');
@@ -400,7 +480,8 @@ begin
     end if;
     update public.leaderboard
       set nickname = v_nick, secret_hash = v_hash,
-          level = p_level, xp = p_xp, pet = p_pet,
+          level = v_level, xp = v_total - public.total_xp(v_level, 0), pet = p_pet,
+          xp_base = v_base, xp_by_device = v_xp_dev,
           pomo_by_device = v_devices,
           -- 꾸미기를 모르는 옛 앱이 올리면(null) 저장돼 있던 것을 지우지 않는다
           deco = case when p_deco is null then coalesce(v_row.deco, '{}'::jsonb)
@@ -419,7 +500,9 @@ begin
   return jsonb_build_object(
     'updated_at', v_row.updated_at,
     'pomo_others', public.sum_pomo(v_row.pomo_by_device, p_device),
-    'stats', coalesce(v_row.stats, '{}'::jsonb)
+    'stats', coalesce(v_row.stats, '{}'::jsonb),
+    -- 이 PC 몫을 뺀 나머지 — 앱이 자기 몫을 더해 레벨을 맞춘다 (옛 앱이면 null)
+    'xp_others', case when v_ledger then v_total - v_mine end
   );
 end;
 $$;
@@ -455,6 +538,10 @@ begin
     'deco', coalesce(v_row.deco, '{}'::jsonb),
     'stats', coalesce(v_row.stats, '{}'::jsonb),
     'pomo_others', public.sum_pomo(v_row.pomo_by_device, p_device),
+    -- 경험치 장부 — 앱이 자기 열쇠 몫을 빼서 "나머지"를 구한다 (코드를 아는 본인만 받는다)
+    'xp_total', coalesce(v_row.xp_base, public.total_xp(v_row.level, v_row.xp))
+                + public.sum_xp(v_row.xp_by_device, null),
+    'xp_by_device', coalesce(v_row.xp_by_device, '{}'::jsonb),
     'updated_at', v_row.updated_at
   );
 end;
@@ -474,3 +561,5 @@ revoke execute on function public.clean_stats(jsonb) from public, anon, authenti
 revoke execute on function public.merge_stats(jsonb, jsonb) from public, anon, authenticated;
 revoke execute on function public.total_xp(int, int) from public, anon, authenticated;
 revoke execute on function public.current_week_key() from public, anon, authenticated;
+revoke execute on function public.level_from_total(bigint) from public, anon, authenticated;
+revoke execute on function public.sum_xp(jsonb, text) from public, anon, authenticated;
