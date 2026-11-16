@@ -201,11 +201,17 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      sandbox: true,
       // 다른 앱 뒤에 가려져도 타이머·렌더가 멈추지 않게 (점수 정산이 밀리지 않도록)
       backgroundThrottling: false,
     },
   });
   applyOnTop(settings.onTop);
+
+  // 이 창은 index.html 하나만 보여 준다 — 새 창이나 다른 주소로의 이동은 전부 막는다.
+  // 지금 그런 코드는 없지만, 언젠가 화면에 남의 글자가 섞여 들어가도 여기서 멈춘다
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
 
   const q = [`pet_px=${settings.petPx}`]; // 첫 프레임부터 제 크기로 그리도록
   if (process.env.DEMO) q.push(`demo=${process.env.DEMO}`);
@@ -425,8 +431,8 @@ function startInputHooks() {
 /* ================================================================
  * 자동 업데이트 — GitHub 릴리즈 피드(latest*.yml)로 새 버전을 확인
  *  - Windows(NSIS): electron-updater가 받아서 재시작할 때 설치
- *  - macOS: ad-hoc 서명이라 Squirrel 설치가 안 된다 → 같은 피드에서
- *    zip을 받아 sha512 검증 후 .app을 직접 바꿔치기하고 재시작.
+ *  - macOS: 자체 서명이라 Squirrel 설치가 안 된다 → 같은 피드에서
+ *    zip을 받아 sha512와 코드 서명을 검증한 뒤 .app을 직접 바꿔치기하고 재시작.
  *    zip 해제는 반드시 ditto로 — 노드 zip 라이브러리는 심볼릭 링크와
  *    실행 권한을 깨뜨려 "손상된 앱"을 만든다
  * ================================================================ */
@@ -587,6 +593,21 @@ async function manualUpdateFallback(version) {
   if (response === 0) shell.openExternal(RELEASES_URL);
 }
 
+/* 새 번들이 우리 인증서로 서명됐는지 — sha512는 같은 릴리즈의 latest-mac.yml에서
+ * 오므로 "받다가 깨지지 않았다"만 보장한다. 릴리즈 자체가 바꿔치기되면 해시도 같이
+ * 바뀌어 통과한다. 이 앱은 손쉬운 사용 권한을 갖고 있어 가짜가 깔리면 키 입력이
+ * 통째로 넘어가므로, 번들 ID와 서명 인증서(지문 고정)까지 맞아야 교체한다.
+ * 실패하면 throw → 수동 다운로드 안내로 빠진다.
+ * 인증서를 새로 만들면 이 지문도 바꿔야 한다: 옛 인증서로 서명한 버전에 새 지문을
+ * 실어 먼저 내보내고, 그다음 버전부터 새 인증서로 서명할 것
+ * (security find-identity -v -p codesigning 의 40자 해시) */
+const UPDATE_SIGNER_SHA1 = 'B357D356715CD1560B1FEB565832AE0F41EBAC05';
+const UPDATE_BUNDLE_ID = 'com.wooyerine.desktop-pet';
+function verifyUpdateSignature(appPath) {
+  const req = `=identifier "${UPDATE_BUNDLE_ID}" and certificate leaf = H"${UPDATE_SIGNER_SHA1}"`;
+  execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', `-R${req}`, appPath], { stdio: 'pipe' });
+}
+
 /* macOS: zip을 받아 검증하고 실행 중인 .app을 원자적으로 바꿔치기 */
 async function macSwapUpdate(info) {
   // 1) 실행 중인 번들 경로 — Contents/MacOS/실행파일에서 세 단계 위
@@ -637,6 +658,7 @@ async function macSwapUpdate(info) {
     if (!appName) throw new Error('no .app in zip');
     const newApp = path.join(stage, appName);
     fs.accessSync(path.join(newApp, 'Contents', 'MacOS'), fs.constants.R_OK);
+    verifyUpdateSignature(newApp);
 
     // 5) 교체 — 기존을 옆으로 밀고 새것을 제자리에, 실패하면 되돌린다
     const backup = path.join(parent, `.${path.basename(bundle)}.old-${Date.now()}`);

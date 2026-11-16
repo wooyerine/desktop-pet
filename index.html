@@ -2,6 +2,11 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <!-- 스크립트·스타일은 앱에 든 파일만, 통신은 리더보드 서버만. 인라인 스크립트나
+       style="" 속성은 막힌다 (JS에서 el.style.x = … 로 바꾸는 건 된다).
+       서버 주소를 바꾸면 connect-src도 같이 (pet.js의 SB_URL) -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://qefrpkflpdpzxyrwyxvd.supabase.co; base-uri 'none'; form-action 'none'" />
   <title>Desktop Pet</title>
   <link rel="stylesheet" href="style.css" />
 </head>
