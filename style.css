@@ -438,7 +438,11 @@ button:active {
   font-size: 11px;
 }
 /* ---- 업적 패널 ---- */
-#ach-panel { width: 246px; }
+#ach-panel {
+  width: 246px;
+  max-height: 400px; /* 업적이 늘어도 창이 화면을 넘지 않게 — 꾸미기 패널과 같은 높이에서 스크롤 */
+  overflow-y: auto;
+}
 #ach-list {
   list-style: none;
   display: flex;
