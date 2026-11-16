@@ -382,7 +382,7 @@ begin
   if p_level is null or p_level < 1 or p_xp is null or p_xp < 0
      -- 펫을 추가하면 여기도 늘려야 한다. 빠뜨리면 그 펫을 고른 사람은
      -- 점수 업로드가 bad_input으로 조용히 막힌다 (pet.js의 PET_DEFS와 짝)
-     or p_pet not in ('cat', 'dog', 'rabbit', 'hamster', 'otter') then
+     or p_pet not in ('cat', 'dog', 'rabbit', 'hamster', 'otter', 'bear') then
     return jsonb_build_object('error', 'bad_input');
   end if;
   v_client := public.total_xp(p_level, p_xp);

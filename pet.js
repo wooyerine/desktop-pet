@@ -89,6 +89,10 @@ const PAL = {
   j: '#8a5c36', // 해달 몸통 브라운 (따뜻한 초콜릿 — 회갈색이면 원숭이 같다)
   J: '#5c3a22', // 해달 진한 브라운 (귀 / 발 / 그늘)
   i: '#efe2c8', // 해달 크림 (얼굴 / 가슴)
+  d: '#c69a6a', // 테디베어 몸통 캐러멜 (강아지/햄스터보다 채도를 낮춰 봉제 인형 털처럼)
+  H: '#9b7248', // 테디베어 그늘 브라운
+  l: '#e8cba0', // 테디베어 밝은 베이지 (귀 속 / 주둥이 / 발바닥)
+  Q: '#a8322f', // 테디베어 리본 매듭·주름 (진한 빨강)
   q: '#8d4a63', // 군고구마 껍질 자주
   t: '#d98a3f', // 책상 오렌지
   T: '#a85f2a', // 책상 어두운 오렌지
@@ -465,6 +469,59 @@ function otterLowerSprite(shift) {
 const OTTER_LOWER = otterLowerSprite(0);
 const OTTER_LOWER_SWING = otterLowerSprite(1);
 
+/* ---------------- 테디베어 (정면, 동그란 귀 + 빨간 리본) ----------------
+ * 봉제 인형답게 전부 둥글게: 머리 모서리에 얹힌 반원 귀, 넓적한 얼굴,
+ * 밝은 주둥이. 목의 빨간 리본이 이 펫의 전부라 스킨을 입혀도 색이
+ * 바뀌지 않게 몸통 글자(d/H/l)가 아닌 R/Q로 칠한다 */
+const BEAR_SIL = [
+  [[3, 5], [14, 16]],           // 귀 끝 — 둥근 반원
+  [[2, 6], [13, 17]],           // 귀
+  [[2, 17]],                    // 귀 밑동이 정수리와 이어진다
+  [[3, 16]],                    // 귀 아래로 한 칸 들어가야 귀가 따로 보인다
+  [[2, 17]],                    // 눈 높이
+  [[2, 17]],
+  [[2, 17]],                    // 주둥이
+  [[2, 17]],
+  [[3, 16]],                    // 턱
+  [[4, 15]],                    // 목 — 리본 매듭
+  [[3, 16]],                    // 어깨
+  [[2, 17]],                    // 몸 — 머리보다 넓어지면 뚱뚱해 보인다
+  [[2, 17]],
+  [[2, 17]],
+  [[2, 17]],
+  [[3, 16]],                    // 책상 뒤로
+];
+
+const BEAR_PAINT = [
+  // 귀 속 밝은 베이지
+  [1, 3, 5, 'l'], [1, 14, 16, 'l'],
+  [2, 3, 5, 'l'], [2, 14, 16, 'l'],
+  // 얼굴 옆 그늘
+  [6, 2, 2, 'H'], [6, 17, 17, 'H'],
+  [7, 2, 3, 'H'], [7, 16, 17, 'H'],
+  [8, 3, 4, 'H'], [8, 15, 16, 'H'],
+  // 밝은 주둥이
+  [6, 7, 12, 'l'],
+  [7, 6, 13, 'l'],
+  [8, 7, 12, 'l'],
+  // 빨간 리본 — 양쪽 고리가 매듭보다 위아래로 도톰하고, 꼬리 두 가닥이 가슴으로
+  [8, 5, 6, 'R'], [8, 13, 14, 'R'],
+  [9, 4, 15, 'R'],
+  [10, 4, 8, 'R'], [10, 11, 15, 'R'],
+  [11, 7, 8, 'R'], [11, 11, 12, 'R'],
+  [12, 6, 7, 'R'], [12, 12, 13, 'R'],
+  [9, 9, 10, 'Q'],                            // 매듭
+  [9, 7, 7, 'Q'], [9, 12, 12, 'Q'],           // 고리 주름
+  [12, 6, 6, 'Q'], [12, 13, 13, 'Q'],         // 꼬리 끝
+  // 어깨/옆구리 그늘
+  [10, 3, 3, 'H'], [10, 16, 16, 'H'],
+  [11, 2, 3, 'H'], [11, 16, 17, 'H'],
+  [12, 2, 2, 'H'], [12, 17, 17, 'H'],
+  [13, 2, 2, 'H'], [13, 17, 17, 'H'],
+  [14, 2, 2, 'H'], [14, 17, 17, 'H'],
+  [15, 3, 3, 'H'], [15, 16, 16, 'H'],
+];
+
 /* ---------------- 펫 정의 (🐾 버튼으로 교체) ---------------- */
 const PET_DEFS = {
   cat: {
@@ -534,6 +591,17 @@ const PET_DEFS = {
       sprite(spr, 11, 19);
     },
   },
+  bear: {
+    sprite: buildSprite(BEAR_SIL, BEAR_PAINT, 'd'),
+    paw: ['.kkk.', 'kdddk', 'klldk', '.kkk.'],
+    eyes: { lx: 6, rx: 12, y: 4 },
+    acc: { l: 2, r: 17, top: 2 },
+    face(dy) {
+      // 진한 갈색 코 — 주둥이 맨 위에 도톰하게, 아래로 짧은 입선
+      rect(PET_X + 9, PET_Y + dy + 6, 2, 1, 'E');
+      rect(PET_X + 9, PET_Y + dy + 7, 2, 1, 'B');
+    },
+  },
 };
 
 /* 서 있을 때의 정면 (돌아다니다 멈춰 이쪽을 볼 때) — 앉은 스프라이트는 책상
@@ -562,13 +630,18 @@ const OTTER_STAND_PAINT = [
   [12, 1, 1, 'J'], [12, 14, 14, 'J'],          // 옆구리 그늘
 ];
 PET_DEFS.otter.stand = standSprite(OTTER_STAND_SIL, OTTER_STAND_PAINT, 'j');
+PET_DEFS.bear.stand = standSprite(BEAR_SIL, BEAR_PAINT, 'd');
 
-const PET_ORDER = ['cat', 'dog', 'rabbit', 'hamster', 'otter'];
+const PET_ORDER = ['cat', 'dog', 'rabbit', 'hamster', 'otter', 'bear'];
+const PET_EMOJI = { cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', otter: '🦦', bear: '🧸' };
+const PET_LABELS = { cat: '고양이', dog: '강아지', rabbit: '토끼', hamster: '햄스터', otter: '해달', bear: '테디베어' };
+/* 업적으로만 얻는 펫 — 달성 전엔 🐾 목록에 아예 나오지 않는다 (히든) */
+const PET_ACH = { bear: 'eventTeddy' };
 
 /* ---------------- 옆모습 (돌아다닐 때) ----------------
  * 오른쪽을 보는 실루엣만 그리고 왼쪽은 좌우 반전. 다리는 실루엣에 없고
  * 걸음 위상에 따라 프로그램으로 붙인다. gait: walk(네 발 엇갈려) /
- * hop(토끼 — 뛰어오를 땐 다리를 오므린다) / waddle(해달 — 두 발로 뒤뚱).
+ * hop(토끼 — 뛰어오를 땐 다리를 오므린다) / waddle(해달·테디베어 — 두 발로 뒤뚱).
  * 그림은 참고 이미지처럼 단순하게: 굵은 테두리 + 단색 몸 + 볼터치 + 배 한 덩이 */
 const SIDE_DEFS = {
   cat: {
@@ -723,6 +796,47 @@ const SIDE_DEFS = {
     eye: { x: 17, y: 3 }, nose: { x: 22, y: 5, c: 'k' },
     arm: { x: 22, y: 11, w: 3, h: 2, c: 'J' }, // 몸 앞으로 튀어나온 조그만 팔 — 걸으면 까딱까딱
     legs: { y: 18, xs: [9, 15], h: 3, toe: 'J' },
+  },
+  bear: {
+    // 두 발로 서서 뒤뚱뒤뚱 — 봉제 인형이 일어나 걷는 느낌.
+    // 주둥이는 딱 한 칸만, 뭉툭하게 나온다 (두 칸 나오거나 끝이 뾰족하면 쥐가 된다).
+    // 눈을 얼굴 아래쪽에 두고 이마를 넓게 — 그래야 인형 얼굴이다
+    base: 'd', gait: 'waddle',
+    sil: [
+      [[10, 12], [17, 19]],            // 동그란 귀 — 큼직하게
+      [[9, 13], [16, 20]],
+      [[9, 21]],                       // 정수리
+      [[8, 22]],
+      [[8, 22]],
+      [[8, 22]],                       // 눈 높이
+      [[8, 23]],                       // 뭉툭한 주둥이
+      [[8, 23]],
+      [[8, 23]],
+      [[9, 21]],                       // 턱
+      [[11, 19]],                      // 목 — 리본
+      [[10, 20]],                      // 몸통 — 머리보다 홀쭉하게
+      [[9, 21]],
+      [[9, 21]],
+      [[9, 21]],
+      [[7, 21]],                       // 동그란 꼬리
+      [[7, 20]],
+      [[9, 19]],
+    ],
+    paint: [
+      [1, 10, 12, 'l'], [1, 17, 19, 'l'],      // 귀 속
+      [5, 8, 8, 'H'], [6, 8, 8, 'H'], [7, 8, 9, 'H'], [8, 8, 9, 'H'], // 뒤통수 그늘
+      [6, 20, 23, 'l'], [7, 19, 23, 'l'], [8, 20, 23, 'l'], // 밝은 주둥이
+      [6, 22, 22, 'E'],                        // 코 (끝 한 칸은 nose가 칠한다)
+      [8, 15, 16, 'p'],                        // 볼터치
+      [13, 14, 19, 'l'], [14, 13, 19, 'l'], [15, 13, 19, 'l'], [16, 14, 18, 'l'], // 밝은 배
+      [12, 9, 9, 'H'], [13, 9, 9, 'H'], [14, 9, 9, 'H'], [16, 7, 8, 'H'], // 등·꼬리 그늘
+      [10, 15, 19, 'R'], [11, 15, 19, 'R'],    // 목의 리본 — 매듭 양옆 고리
+      [12, 16, 16, 'R'], [12, 18, 18, 'R'],    //   꼬리 두 가닥
+      [10, 17, 17, 'Q'], [11, 17, 17, 'Q'],    // 매듭
+    ],
+    eye: { x: 17, y: 5 }, nose: { x: 23, y: 6, c: 'E' },
+    arm: { x: 21, y: 13, w: 3, h: 2, c: 'd' }, // 앞으로 내민 짧은 팔 — 걸으면 까딱, 기지개 땐 위로 쭉
+    legs: { y: 18, xs: [10, 15], h: 3, toe: 'l' },
   },
 };
 const SIDE_W = 28; // 테두리 포함 폭
@@ -891,6 +1005,38 @@ const FLOP_DEFS = {
       [5, 11, 11, 'J'], [6, 11, 11, 'J'], [7, 11, 11, 'J'], [8, 11, 11, 'J'], // 목 그늘
     ],
     eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'k' },
+  },
+  bear: {
+    base: 'd',
+    sil: [
+      [[2, 3], [9, 10]],                      // 동그란 귀
+      [[1, 4], [8, 11]],
+      [[2, 10]],
+      [[1, 11], [13, 14]],
+      [[1, 11], [12, 15], [18, 20]],
+      [[0, 25]],
+      [[0, 25]],
+      [[0, 25]],
+      [[1, 25]],
+      [[1, 24]],
+      [[2, 24]],
+      [[3, 24]],
+      [[10, 24]],
+    ],
+    leg: [
+      [[0, 22, 23], [1, 21, 24], [2, 21, 24], [3, 20, 24]],
+      [[1, 23, 25], [2, 22, 25], [3, 21, 24]],
+    ],
+    paint: [
+      [1, 2, 3, 'l'], [1, 9, 10, 'l'],                        // 귀 속
+      [7, 3, 8, 'l'], [8, 3, 8, 'l'],                         // 주둥이
+      [4, 12, 12, 'l'], [4, 15, 15, 'l'],                     // 앞발 발바닥
+      [6, 15, 21, 'l'], [7, 14, 22, 'l'], [8, 13, 23, 'l'],
+      [9, 13, 23, 'l'], [10, 14, 22, 'l'], [11, 16, 20, 'l'], // 밝은 배
+      [5, 11, 12, 'R'], [6, 11, 13, 'R'], [7, 11, 13, 'R'], [8, 11, 12, 'R'], // 목의 리본
+      [6, 12, 12, 'Q'], [7, 12, 12, 'Q'],                     // 매듭
+    ],
+    eyes: { lx: 3, rx: 7, y: 5 }, nose: { x: 5, y: 7, w: 2, c: 'E' },
   },
 };
 
@@ -2181,6 +2327,7 @@ const PET_BODY_CHARS = {
   rabbit: { base: 'w', shade: 'u' },
   hamster: { base: 'n', shade: 'N', light: 'w' },
   otter: { base: 'j', shade: 'J', light: 'i' },
+  bear: { base: 'd', shade: 'H', light: 'l' },
 };
 
 const SKINS = {
@@ -3155,6 +3302,14 @@ const ACHIEVEMENTS = {
     emoji: '💐', label: '봄 꽃꽂이', desc: '4월 15일~5월 15일에 뽀모도로 20회 완주',
     goal: 20, window: ['04-15', '05-15'], val: () => eventPomos('eventVase'), reward: 'vase',
   },
+  // ---- 히든 — 겨울 이벤트(eventIce)를 20회에서 멈추지 않고 30회까지 달린 사람에게
+  //      펫이 하나 온다. 횟수는 eventIce 것을 그대로 본다 — window를 따로 두면
+  //      이벤트 안내·집계에 이름이 드러난다. 철 없이 한 번 얻으면 계속 쓴다 ----
+  eventTeddy: {
+    emoji: '🧸', label: '산타 할아버지의 선물', desc: '겨울 준비 기간에 뽀모도로 30회 완주',
+    goal: 30, val: () => eventPomos('eventIce'), reward: 'bear',
+    hidden: '산타 할아버지는 누가 열심히 일했는지 다 알고 계신대…',
+  },
   // ---- 히든 — 뽀모도로 누적 시간. 달성 전엔 이름을 숨기고 hint만 보인다 ----
   soup100: {
     emoji: '🥣', label: '100시간 우려낸 토마토 스프', desc: '뽀모도로 누적 100시간',
@@ -3181,7 +3336,8 @@ function pomoHours() {
 function rewardItems(a) {
   if (!a.reward) return [];
   const keys = Array.isArray(a.reward) ? a.reward : [a.reward];
-  return keys.map((k) => DESK_ITEMS[k] || SKINS[k] || SCREEN_ITEMS[k]).filter(Boolean);
+  return keys.map((k) => DESK_ITEMS[k] || SKINS[k] || SCREEN_ITEMS[k] ||
+    (PET_DEFS[k] && { emoji: PET_EMOJI[k], label: PET_LABELS[k] })).filter(Boolean);
 }
 
 /* 오늘이 그 이벤트 기간인가 ('MM-DD'끼리 문자열 비교) */
@@ -3224,6 +3380,11 @@ function achUnlocked(id) {
   return stats.done.includes(id);
 }
 
+/* 업적 펫인데 아직 못 얻었나 */
+function petLocked(k) {
+  return !!PET_ACH[k] && !achUnlocked(PET_ACH[k]);
+}
+
 /* 시즌 아이템이면 지금 그 달인가 */
 const MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 function inSeason(it) {
@@ -3242,6 +3403,12 @@ function itemLocked(it) {
 
 /* 잠긴 아이템이 장착된 채로 시작하면(테스트 모드에서 골랐거나 데이터가 꼬였거나)
  * 기본값으로 되돌린다. 데모 URL 파라미터로 지정한 경우는 그대로 둔다 */
+(function sanitizePet() {
+  if (SANDBOX || params.get('pet') || !petLocked(petKind)) return;
+  petKind = 'cat';
+  try { localStorage.setItem('petKind', petKind); } catch (_) { /* 무시 */ }
+})();
+
 (function sanitizeEquipped() {
   if (SANDBOX || params.get('desk') || params.get('acc') || params.get('skin') ||
       params.get('deskstyle') || params.get('kb') || params.get('screen')) return;
@@ -3375,7 +3542,6 @@ setInterval(() => {
 const SB_URL = 'https://qefrpkflpdpzxyrwyxvd.supabase.co';
 const SB_KEY = 'sb_publishable_epIs7YckEJ8ETJkrrUHKfw_lhH6FEMA';
 const SB_TABLE = 'leaderboard';
-const PET_EMOJI = { cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', otter: '🦦' };
 
 let nickname = localStorage.getItem('nickname') || '';
 let syncCode = localStorage.getItem('syncCode') || '';
@@ -4484,7 +4650,7 @@ function drawRoamPet(now, moving, speaking) {
     if (rim) spriteRim(body, ox, oy, rim);
     sprite(body, ox, oy);
   } else {
-    // 해달 기지개 — 두 발로 서서 팔을 위로 쭉 (phase 5), 몸도 한 칸 위로
+    // 해달·테디베어 기지개 — 두 발로 서서 팔을 위로 쭉 (phase 5), 몸도 한 칸 위로
     const stretching = action === 'stretch';
     let grid = sideSprite(petKind, roam.dir, stretching ? 5 : phase);
     const oy = ROAM_BOX_H - 1 - grid.length - lift - (stretching && Math.floor(now / 1000) % 2 ? 1 : 0);
@@ -5192,11 +5358,11 @@ function decoRow(elId, items, getSel, setSel, storeKey, say) {
   })));
 }
 
-const PET_LABELS = { cat: '고양이', dog: '강아지', rabbit: '토끼', hamster: '햄스터', otter: '해달' };
 
 function renderDeco() {
   const pets = document.getElementById('deco-pets');
-  pets.replaceChildren(...PET_ORDER.map((k) =>
+  // 못 얻은 업적 펫은 잠금 칸도 보이지 않는다 (다른 PC에서 받아 와 쓰는 중이면 보인다)
+  pets.replaceChildren(...PET_ORDER.filter((k) => !petLocked(k) || petKind === k).map((k) =>
     decoButton(PET_EMOJI[k], PET_LABELS[k], petKind === k, null, () => {
       if (petKind === k) return;
       petKind = k;
